@@ -61,6 +61,7 @@ def init_db():
             rows INTEGER NOT NULL,
             seats_per_row INTEGER NOT NULL,
             capacity INTEGER NOT NULL,
+            row_config TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (organizer_id) REFERENCES organizers(id)
         );
@@ -219,6 +220,23 @@ def get_booked_seats(event_id):
     for r in rows:
         all_seats.extend(r["seats"].split(","))
     return [s.strip() for s in all_seats if s.strip()]
+
+
+def parse_row_config(venue):
+    """Return {row_letter: seat_count} dict for a venue row.
+    Falls back to uniform seats_per_row if row_config is NULL."""
+    import json
+    if venue["row_config"]:
+        try:
+            return json.loads(venue["row_config"])
+        except Exception:
+            pass
+    letters = list(LABELS[:venue["rows"]])
+    return {l: venue["seats_per_row"] for l in letters}
+
+
+def row_config_capacity(cfg):
+    return sum(cfg.values())
 
 
 def calc_seat_total(seats, tiers, base_price):
@@ -427,7 +445,7 @@ def org_event_detail(event_id):
     conn   = get_db()
     event  = conn.execute("""
         SELECT e.*, v.name as venue_name, v.location as venue_location,
-               v.rows, v.seats_per_row, v.capacity
+               v.rows, v.seats_per_row, v.capacity, v.row_config
         FROM events e LEFT JOIN venues v ON e.venue_id=v.id
         WHERE e.id=? AND e.organizer_id=?
     """, (event_id, org_id)).fetchone()
@@ -441,9 +459,11 @@ def org_event_detail(event_id):
     conn.close()
     booked_seats = get_booked_seats(event_id)
     row_letters  = list(LABELS[:event["rows"]]) if event["rows"] else []
+    row_config   = parse_row_config(event)
     return render_template("event_detail.html", event=event, bookings=bookings,
                            booked_seats=booked_seats, performers=performers,
-                           photos=photos, tiers=tiers, row_letters=row_letters)
+                           photos=photos, tiers=tiers, row_letters=row_letters,
+                           row_config=row_config)
 
 
 @app.route("/org/events/<event_id>/delete", methods=["POST"])
@@ -599,18 +619,22 @@ def org_venues_list():
 @app.route("/org/venues/create", methods=["GET", "POST"])
 @require_organizer
 def org_create_venue():
+    import json
     org_id = session["organizer_id"]
     if request.method == "POST":
         rows          = int(request.form["rows"])
         seats_per_row = int(request.form["seats_per_row"])
+        # Build initial uniform row_config
+        cfg = {LABELS[i]: seats_per_row for i in range(rows)}
         conn = get_db()
         vid  = new_id()
         conn.execute(
-            "INSERT INTO venues (id,organizer_id,name,location,rows,seats_per_row,capacity,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT INTO venues (id,organizer_id,name,location,rows,seats_per_row,capacity,row_config,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (vid, org_id, request.form["name"], request.form["location"],
-             rows, seats_per_row, rows * seats_per_row, datetime.now().isoformat()))
+             rows, seats_per_row, rows * seats_per_row,
+             json.dumps(cfg), datetime.now().isoformat()))
         conn.commit(); conn.close()
-        flash("Venue created! Add some photos to show it off.", "success")
+        flash("Venue created! Now customise each row's seat count.", "success")
         return redirect(url_for("org_venue_detail", venue_id=vid))
     return render_template("create_venue.html")
 
@@ -624,9 +648,40 @@ def org_venue_detail(venue_id):
     if not venue:
         conn.close(); flash("Venue not found.", "error")
         return redirect(url_for("org_venues_list"))
-    photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC", (venue_id,)).fetchall()
+    photos     = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC", (venue_id,)).fetchall()
     conn.close()
-    return render_template("venue_detail.html", venue=venue, photos=photos)
+    row_config = parse_row_config(venue)
+    return render_template("venue_detail.html", venue=venue, photos=photos, row_config=row_config)
+
+
+@app.route("/org/venues/<venue_id>/rows", methods=["POST"])
+@require_organizer
+def org_update_venue_rows(venue_id):
+    import json
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    venue  = conn.execute("SELECT * FROM venues WHERE id=? AND organizer_id=?", (venue_id, org_id)).fetchone()
+    if not venue:
+        conn.close(); flash("Venue not found.", "error")
+        return redirect(url_for("org_venues_list"))
+
+    letters = list(LABELS[:venue["rows"]])
+    cfg = {}
+    for l in letters:
+        val = request.form.get(f"row_{l}", "").strip()
+        try:
+            cnt = max(1, int(val))
+        except ValueError:
+            cnt = venue["seats_per_row"]
+        cfg[l] = cnt
+
+    capacity = row_config_capacity(cfg)
+    conn.execute(
+        "UPDATE venues SET row_config=?, capacity=? WHERE id=?",
+        (json.dumps(cfg), capacity, venue_id))
+    conn.commit(); conn.close()
+    flash("Seat layout saved!", "success")
+    return redirect(url_for("org_venue_detail", venue_id=venue_id))
 
 
 @app.route("/org/venues/<venue_id>/photos/add", methods=["POST"])
@@ -855,7 +910,7 @@ def book_event(event_id):
     conn  = get_db()
     event = conn.execute("""
         SELECT e.*, v.name as venue_name, v.location as venue_location,
-               v.rows, v.seats_per_row, v.capacity, v.id as venue_db_id,
+               v.rows, v.seats_per_row, v.capacity, v.row_config, v.id as venue_db_id,
                o.org_name as organizer_name
         FROM events e
         LEFT JOIN venues v ON e.venue_id=v.id
@@ -898,10 +953,12 @@ def book_event(event_id):
         flash("Booking confirmed!", "success")
         return redirect(url_for("view_ticket", booking_id=booking_id))
 
+    row_config = parse_row_config(event)
     conn.close()
     return render_template("book_event.html", event=event, booked_seats=booked_seats,
                            tiers=tiers, performers=performers,
-                           event_photos=event_photos, venue_photos=venue_photos)
+                           event_photos=event_photos, venue_photos=venue_photos,
+                           row_config=row_config)
 
 
 @app.route("/ticket/<booking_id>")

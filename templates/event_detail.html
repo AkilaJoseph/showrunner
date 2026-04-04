@@ -236,11 +236,12 @@
 <script>
 const tiers = {{ tiers | tojson }};
 buildSeatMap("seat-map", {
-    rows: {{ event.rows }},
+    rows:        {{ event.rows }},
     seatsPerRow: {{ event.seats_per_row }},
+    rowConfig:   {{ row_config | tojson }},
     bookedSeats: {{ booked_seats|tojson }},
-    selectable: false,
-    tiers: tiers,
+    selectable:  false,
+    tiers:       tiers,
 });
 
 // Colour preset radio sync with color input

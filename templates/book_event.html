@@ -121,6 +121,7 @@ const eventTiers = {{ tiers|tojson }};
 buildSeatMap("seat-map", {
     rows:        {{ event.rows }},
     seatsPerRow: {{ event.seats_per_row }},
+    rowConfig:   {{ row_config|tojson }},
     bookedSeats: {{ booked_seats|tojson }},
     selectable:  true,
     price:       {{ event.price }},

@@ -11,15 +11,19 @@ document.addEventListener("DOMContentLoaded", () => {
 // ── Seat Map Builder ──────────────────────────────────────────
 //
 // options:
-//   rows, seatsPerRow, bookedSeats, selectable, price, tiers
-//
-// tiers = [{ name, price, color, row_from, row_to }, ...]
-//   row_from / row_to are single letters ('A', 'B' …)
+//   rows         - number of rows
+//   seatsPerRow  - default seat count (used when rowConfig not given)
+//   rowConfig    - { "A": 8, "B": 2, "C": 6, ... } per-row overrides
+//   bookedSeats  - ["A1","B3", ...]
+//   selectable   - bool
+//   price        - base ticket price
+//   tiers        - [{ name, price, color, row_from, row_to }, ...]
 // ─────────────────────────────────────────────────────────────
 function buildSeatMap(containerId, options) {
     const {
         rows        = 5,
         seatsPerRow = 8,
+        rowConfig   = {},        // per-row seat count overrides
         bookedSeats = [],
         selectable  = false,
         price       = 0,
@@ -29,15 +33,22 @@ function buildSeatMap(containerId, options) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const LABELS       = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let selectedSeats  = [];
+    const LABELS      = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let selectedSeats = [];
 
-    // ── tier helpers ──────────────────────────────────────────
+    // How many seats in a given row letter
+    function seatsInRow(rowLabel) {
+        const l = rowLabel.toUpperCase();
+        if (rowConfig && rowConfig[l] !== undefined) return rowConfig[l];
+        return seatsPerRow;
+    }
+
+    // Tier for a given row letter
     function tierForRow(rowLabel) {
         const ri = LABELS.indexOf(rowLabel.toUpperCase());
         for (const t of tiers) {
-            const fi = LABELS.indexOf(t.row_from.toUpperCase());
-            const ti = LABELS.indexOf(t.row_to.toUpperCase());
+            const fi = LABELS.indexOf((t.row_from || "").toUpperCase());
+            const ti = LABELS.indexOf((t.row_to   || "").toUpperCase());
             if (ri >= fi && ri <= ti) return t;
         }
         return null;
@@ -53,7 +64,7 @@ function buildSeatMap(containerId, options) {
         container.innerHTML = "";
 
         // Stage indicator
-        const stageWrap  = document.createElement("div");
+        const stageWrap = document.createElement("div");
         stageWrap.className = "stage-indicator";
         stageWrap.innerHTML = '<div class="stage-line"></div>';
         container.appendChild(stageWrap);
@@ -63,30 +74,32 @@ function buildSeatMap(containerId, options) {
         stageLabel.textContent = "STAGE";
         container.appendChild(stageLabel);
 
-        // Grid
         const grid = document.createElement("div");
         grid.className = "seat-grid";
 
         for (let r = 0; r < rows; r++) {
-            const rowLabel = LABELS[r];
-            const tier     = tierForRow(rowLabel);
-            const rowDiv   = document.createElement("div");
+            const rowLabel  = LABELS[r];
+            const seatCount = seatsInRow(rowLabel);
+            const tier      = tierForRow(rowLabel);
+
+            const rowDiv = document.createElement("div");
             rowDiv.className = "seat-row";
 
-            // Row label (with tier colour if defined)
+            // Row label
             const label = document.createElement("span");
-            label.className = "seat-row-label";
+            label.className   = "seat-row-label";
             label.textContent = rowLabel;
             if (tier) label.style.color = tier.color;
             rowDiv.appendChild(label);
 
-            for (let c = 0; c < seatsPerRow; c++) {
-                const seatId  = `${rowLabel}${c + 1}`;
-                const btn     = document.createElement("button");
-                btn.type      = "button";
-                btn.className = "seat";
+            // Seats
+            for (let c = 0; c < seatCount; c++) {
+                const seatId   = `${rowLabel}${c + 1}`;
+                const btn      = document.createElement("button");
+                btn.type       = "button";
+                btn.className  = "seat";
                 btn.textContent = c + 1;
-                btn.title     = seatId + (tier ? ` — ${tier.name}` : "");
+                btn.title      = seatId + (tier ? ` — ${tier.name}` : "");
 
                 const isBooked   = bookedSeats.includes(seatId);
                 const isSelected = selectedSeats.includes(seatId);
@@ -103,7 +116,7 @@ function buildSeatMap(containerId, options) {
                 } else {
                     btn.classList.add("seat-available");
                     if (tier) {
-                        btn.style.background = tier.color + "22"; // 13% opacity tint
+                        btn.style.background = tier.color + "22";
                         btn.style.border     = `1px solid ${tier.color}55`;
                     }
                 }
@@ -125,7 +138,7 @@ function buildSeatMap(containerId, options) {
         }
         container.appendChild(grid);
 
-        // Tier legend (replaces generic legend when tiers exist)
+        // Legend
         if (tiers.length > 0) {
             const legend = document.createElement("div");
             legend.className = "tier-legend";
@@ -170,7 +183,6 @@ function buildSeatMap(containerId, options) {
             } else {
                 infoDiv.style.display = "block";
 
-                // Build tier breakdown
                 const breakdown = {};
                 let   total     = 0;
                 selectedSeats.forEach(sId => {
@@ -184,7 +196,6 @@ function buildSeatMap(containerId, options) {
                 });
 
                 let html = `<p class="selection-seats">Selected: <strong>${selectedSeats.join(", ")}</strong></p>`;
-
                 if (Object.keys(breakdown).length > 1 || tiers.length > 0) {
                     html += `<div class="selection-breakdown">`;
                     for (const [name, info] of Object.entries(breakdown)) {
@@ -196,7 +207,6 @@ function buildSeatMap(containerId, options) {
                     }
                     html += `</div>`;
                 }
-
                 html += `<p class="selection-total">Total: ${total.toLocaleString()} TZS</p>`;
                 infoDiv.innerHTML = html;
             }

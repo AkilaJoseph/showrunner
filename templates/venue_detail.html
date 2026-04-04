@@ -11,7 +11,6 @@
             <p style="color:var(--accent-purple);font-size:13px">📍 {{ venue.location }}</p>
             <div class="tags" style="margin-top:10px">
                 <span class="tag">{{ venue.rows }} rows</span>
-                <span class="tag">{{ venue.seats_per_row }} seats / row</span>
                 <span class="tag tag-gold">{{ venue.capacity }} total seats</span>
             </div>
         </div>
@@ -22,21 +21,59 @@
     </div>
 </div>
 
-<!-- Seat Map -->
+<!-- ── Per-Row Seat Layout Editor ── -->
 <div class="card" style="margin-bottom:20px">
-    <p class="section-title">Seat Layout</p>
-    <div class="seat-map-container" id="seat-map"></div>
+    <p class="section-title">🪑 Seat Layout
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
+            Set how many seats are in each row — rows can have different counts (e.g. Sofa = 2, Regular = 8)
+        </span>
+    </p>
+
+    <form method="POST" action="{{ url_for('org_update_venue_rows', venue_id=venue.id) }}">
+        <div class="row-config-table">
+            {% for letter, count in row_config.items() %}
+            <div class="row-config-item">
+                <div class="row-config-label" id="label-{{ letter }}">
+                    Row {{ letter }}
+                    <span class="row-config-tier-hint" id="tier-hint-{{ letter }}"></span>
+                </div>
+                <div class="row-config-controls">
+                    <button type="button" class="row-count-btn"
+                            onclick="adjustRow('{{ letter }}', -1)">−</button>
+                    <input type="number" name="row_{{ letter }}"
+                           id="row-input-{{ letter }}"
+                           value="{{ count }}" min="1" max="30"
+                           class="row-count-input"
+                           onchange="updatePreview()">
+                    <button type="button" class="row-count-btn"
+                            onclick="adjustRow('{{ letter }}', 1)">+</button>
+                </div>
+                <span class="row-config-seats-label" id="seats-label-{{ letter }}">{{ count }} seats</span>
+            </div>
+            {% endfor %}
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+            <button type="submit" class="btn btn-primary">Save Layout</button>
+            <span style="font-size:12px;color:var(--text-muted)" id="total-capacity-hint">
+                Total: {{ venue.capacity }} seats
+            </span>
+        </div>
+    </form>
+
+    <!-- Live preview -->
+    <div style="margin-top:20px">
+        <p class="section-title" style="margin-bottom:8px">Preview</p>
+        <div class="seat-map-container" id="seat-map-preview"></div>
+    </div>
 </div>
 
 <!-- ── Venue Photos ── -->
 <div class="card">
-    <div class="page-header" style="margin-bottom:16px">
-        <p class="section-title" style="margin-bottom:0">Venue Photos
-            <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
-                Help guests feel the vibe before they arrive
-            </span>
-        </p>
-    </div>
+    <p class="section-title">📷 Venue Photos
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
+            Help guests feel the vibe before they arrive
+        </span>
+    </p>
 
     {% if photos %}
     <div class="photo-grid">
@@ -55,7 +92,6 @@
     <div class="empty-state" style="margin-bottom:20px">No photos yet — upload some to show guests how beautiful this venue is!</div>
     {% endif %}
 
-    <!-- Upload Form -->
     <form method="POST" action="{{ url_for('org_add_venue_photo', venue_id=venue.id) }}"
           enctype="multipart/form-data" class="upload-zone" id="venue-upload-zone">
         <div class="upload-zone-inner" onclick="document.getElementById('venue-photo-input').click()">
@@ -63,7 +99,7 @@
             <p class="upload-label">Click to choose a photo</p>
             <p class="upload-hint">PNG, JPG, GIF or WEBP</p>
             <input type="file" id="venue-photo-input" name="photo" accept="image/*"
-                   style="display:none" onchange="previewAndSubmitLabel(this,'venue-upload-zone')">
+                   style="display:none" onchange="previewLabel(this,'venue-upload-zone')">
         </div>
         <div class="field" style="margin-top:12px;margin-bottom:0">
             <label for="venue-caption">Caption (optional)</label>
@@ -76,18 +112,46 @@
 
 {% block scripts %}
 <script>
-buildSeatMap("seat-map", {
-    rows: {{ venue.rows }},
-    seatsPerRow: {{ venue.seats_per_row }},
+const rowConfig = {{ row_config | tojson }};
+const venueRows = {{ venue.rows }};
+
+function adjustRow(letter, delta) {
+    const input = document.getElementById('row-input-' + letter);
+    const newVal = Math.max(1, Math.min(30, parseInt(input.value || 1) + delta));
+    input.value = newVal;
+    updatePreview();
+}
+
+function updatePreview() {
+    const cfg = {};
+    let total = 0;
+    Object.keys(rowConfig).forEach(l => {
+        const v = parseInt(document.getElementById('row-input-' + l).value) || 1;
+        cfg[l] = v;
+        total += v;
+        document.getElementById('seats-label-' + l).textContent = v + ' seat' + (v === 1 ? '' : 's');
+    });
+    document.getElementById('total-capacity-hint').textContent = 'Total: ' + total.toLocaleString() + ' seats';
+
+    buildSeatMap("seat-map-preview", {
+        rows:        venueRows,
+        rowConfig:   cfg,
+        bookedSeats: [],
+        selectable:  false,
+    });
+}
+
+// Initial preview render
+buildSeatMap("seat-map-preview", {
+    rows:        venueRows,
+    rowConfig:   rowConfig,
     bookedSeats: [],
-    selectable: false,
+    selectable:  false,
 });
 
-function previewAndSubmitLabel(input, zoneId) {
-    const zone = document.getElementById(zoneId);
-    if (input.files && input.files[0]) {
-        zone.querySelector('.upload-label').textContent = input.files[0].name;
-    }
+function previewLabel(input, zoneId) {
+    if (input.files && input.files[0])
+        document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
 }
 </script>
 {% endblock %}
