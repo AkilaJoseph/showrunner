@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Browse Events — ShowRunner{% endblock %}
 {% block content %}
-<h2 class="page-title">Browse Events</h2>
-<p class="page-subtitle">Pick an event, choose your seats, and get your digital ticket.</p>
+
+<div class="pub-hero animate-in">
+    <p class="pub-hero-title">What's On Tonight?</p>
+    <p class="pub-hero-sub">Grab your seat before it's gone — comedy, music, live shows & more.</p>
+</div>
 
 {% if events %}
 <div>
@@ -16,15 +19,13 @@
                 <p style="font-size:11px;color:var(--text-muted);margin-top:3px">by {{ ev.organizer_name }}</p>
                 {% endif %}
             </div>
-            <div style="text-align:right">
-                <span style="font-size:18px;font-weight:700;color:var(--accent-gold);font-family:var(--font-mono)">
-                    {{ "{:,.0f}".format(ev.price) }} TZS
-                </span>
+            <div style="text-align:right;flex-shrink:0">
+                <p class="event-price">{{ "{:,.0f}".format(ev.price) }} <span class="event-price-unit">TZS</span></p>
                 {% set remaining = (ev.capacity or 0) - ev.booked %}
-                <p style="font-size:12px;margin-top:4px;color:{% if remaining > 0 %}var(--accent-teal){% else %}var(--accent-red){% endif %}">
-                    {{ remaining }} seats left
+                <p style="font-size:12px;margin-top:4px;color:{% if remaining > 5 %}var(--accent-teal){% elif remaining > 0 %}var(--accent-gold){% else %}var(--accent-red){% endif %}">
+                    {% if remaining > 0 %}{{ remaining }} seats left{% else %}Sold out{% endif %}
                 </p>
-                <div class="progress-bar" style="margin-top:4px">
+                <div class="progress-bar">
                     <div class="progress-fill" style="width:{{ ((ev.booked / ev.capacity * 100) if ev.capacity else 0)|int }}%"></div>
                 </div>
             </div>

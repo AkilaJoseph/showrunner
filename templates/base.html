@@ -5,102 +5,132 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ShowRunner{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <!-- Toast Messages -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="toast-container">
-        {% for category, message in messages %}
-        <div class="toast toast-{{ category }}">{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
 
-    <!-- Header -->
-    <header class="header">
-        {% if current_organizer %}
-        <a href="{{ url_for('org_dashboard') }}" class="header-brand">
-        {% else %}
-        <a href="{{ url_for('book_list') }}" class="header-brand">
-        {% endif %}
-            <div class="header-icon">🎤</div>
-            <div>
-                <h1 class="header-title">ShowRunner</h1>
-                {% if current_organizer %}
-                <p class="header-sub">{{ current_organizer.org_name | upper }}</p>
-                {% else %}
-                <p class="header-sub">EVENT & TICKET MANAGER</p>
-                {% endif %}
+<!-- Toast Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="toast-container">
+    {% for category, message in messages %}
+    <div class="toast toast-{{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{# ── Open layout wrapper ── #}
+{% if current_organizer %}
+
+<div class="org-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <a href="{{ url_for('org_dashboard') }}" class="sidebar-brand-row" style="text-decoration:none">
+                <div class="sidebar-icon">🎤</div>
+                <span class="sidebar-title">ShowRunner</span>
+            </a>
+            <div style="margin-top:10px">
+                <span class="sidebar-org-name">{{ current_organizer.org_name }}</span>
             </div>
-        </a>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('org_dashboard') }}"
+               class="sidebar-nav-item {% if request.endpoint == 'org_dashboard' %}active{% endif %}">
+                <span class="sidebar-nav-icon">◆</span> Dashboard
+            </a>
+            <a href="{{ url_for('org_events_list') }}"
+               class="sidebar-nav-item {% if request.endpoint in ['org_events_list','org_create_event','org_event_detail'] %}active{% endif %}">
+                <span class="sidebar-nav-icon">★</span> Events
+            </a>
+            <a href="{{ url_for('org_venues_list') }}"
+               class="sidebar-nav-item {% if request.endpoint in ['org_venues_list','org_create_venue'] %}active{% endif %}">
+                <span class="sidebar-nav-icon">▣</span> Venues
+            </a>
+            <a href="{{ url_for('org_bookings_list') }}"
+               class="sidebar-nav-item {% if request.endpoint == 'org_bookings_list' %}active{% endif %}">
+                <span class="sidebar-nav-icon">◈</span> Bookings
+            </a>
+            <div class="sidebar-divider"></div>
+            <a href="{{ url_for('org_verify_ticket') }}"
+               class="sidebar-nav-item {% if request.endpoint == 'org_verify_ticket' %}active{% endif %}"
+               style="{% if request.endpoint == 'org_verify_ticket' %}background:rgba(62,207,198,0.1);color:var(--accent-teal);border:1px solid rgba(62,207,198,0.18){% endif %}">
+                <span class="sidebar-nav-icon">✓</span> Verify Ticket
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-divider"></div>
+            <a href="{{ url_for('org_logout') }}" class="sidebar-logout">
+                <span class="sidebar-nav-icon">→</span> Logout
+            </a>
+        </div>
+    </aside>
 
-        {% if current_organizer %}
-        <!-- Organizer role pill -->
-        <div style="margin-left:auto">
+    <div class="org-body">
+        <div class="org-topbar">
+            <button class="sidebar-toggle" onclick="toggleSidebar()" style="margin-right:auto">☰</button>
+            <span class="org-topbar-name">{{ current_organizer.name }}</span>
             <span class="role-pill role-pill-org">Organizer</span>
         </div>
-        {% elif current_user %}
-        <div style="margin-left:auto">
-            <span class="role-pill role-pill-user">{{ current_user.name }}</span>
-        </div>
-        {% endif %}
-    </header>
+        <div class="org-main">
 
-    <!-- Navigation -->
-    <nav class="nav">
-        {% if current_organizer %}
-        <!-- Organizer nav -->
-        <a href="{{ url_for('org_dashboard') }}" class="nav-item {% if request.endpoint == 'org_dashboard' %}active{% endif %}">
-            <span class="nav-icon">◆</span> Dashboard
-        </a>
-        <a href="{{ url_for('org_events_list') }}" class="nav-item {% if request.endpoint in ['org_events_list','org_create_event','org_event_detail'] %}active{% endif %}">
-            <span class="nav-icon">★</span> Events
-        </a>
-        <a href="{{ url_for('org_venues_list') }}" class="nav-item {% if request.endpoint in ['org_venues_list','org_create_venue'] %}active{% endif %}">
-            <span class="nav-icon">▣</span> Venues
-        </a>
-        <a href="{{ url_for('org_bookings_list') }}" class="nav-item {% if request.endpoint == 'org_bookings_list' %}active{% endif %}">
-            <span class="nav-icon">◈</span> Bookings
-        </a>
-        <a href="{{ url_for('org_verify_ticket') }}" class="nav-item {% if request.endpoint == 'org_verify_ticket' %}active{% endif %}">
-            <span class="nav-icon">✓</span> Verify
-        </a>
-        <a href="{{ url_for('org_logout') }}" class="nav-item nav-item-logout">
-            <span class="nav-icon">→</span> Logout
-        </a>
-        {% else %}
-        <!-- Public / user nav -->
-        <a href="{{ url_for('book_list') }}" class="nav-item {% if request.endpoint in ['book_list','book_event'] %}active{% endif %}">
-            <span class="nav-icon">♦</span> Browse Events
+{% else %}
+
+<header class="pub-header">
+    <a href="{{ url_for('book_list') }}" class="pub-brand">
+        <div class="pub-brand-icon">🎤</div>
+        <div>
+            <div class="pub-brand-title">ShowRunner</div>
+            <div class="pub-brand-sub">Live Events &amp; Tickets</div>
+        </div>
+    </a>
+    <nav class="pub-nav">
+        <a href="{{ url_for('book_list') }}"
+           class="pub-nav-item {% if request.endpoint in ['book_list','book_event'] %}active{% endif %}">
+            Browse Events
         </a>
         {% if current_user %}
-        <a href="{{ url_for('user_logout') }}" class="nav-item nav-item-logout" style="margin-left:auto">
-            <span class="nav-icon">→</span> Logout
-        </a>
+            <span class="role-pill role-pill-user" style="margin-left:6px">{{ current_user.name }}</span>
+            <a href="{{ url_for('user_logout') }}" class="pub-nav-item" style="color:var(--text-muted)">Logout</a>
         {% else %}
-        <a href="{{ url_for('user_login') }}" class="nav-item {% if request.endpoint == 'user_login' %}active{% endif %}" style="margin-left:auto">
-            <span class="nav-icon">↗</span> Log in
-        </a>
-        <a href="{{ url_for('user_register') }}" class="nav-item {% if request.endpoint == 'user_register' %}active{% endif %}">
-            Register
-        </a>
-        <a href="{{ url_for('org_login') }}" class="nav-item nav-item-org">
-            Organizer Portal
-        </a>
-        {% endif %}
+            <a href="{{ url_for('user_login') }}"
+               class="pub-nav-item {% if request.endpoint == 'user_login' %}active{% endif %}">Log in</a>
+            <a href="{{ url_for('user_register') }}" class="pub-nav-btn">Register</a>
         {% endif %}
     </nav>
+</header>
+<main class="pub-main">
 
-    <!-- Main Content -->
-    <main class="main">
-        {% block content %}{% endblock %}
-    </main>
+{% endif %}
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-    {% block scripts %}{% endblock %}
+{# ── Single content block ── #}
+{% block content %}{% endblock %}
+
+{# ── Close layout wrapper ── #}
+{% if current_organizer %}
+        </div>{# /.org-main #}
+    </div>{# /.org-body #}
+</div>{# /.org-layout #}
+{% else %}
+</main>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+    var sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+        if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
+            sidebar.classList.remove('open');
+        }
+    }
+});
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>
