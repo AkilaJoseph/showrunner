@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Browse Events — ShowRunner{% endblock %}
+{% block content %}
+<h2 class="page-title">Browse Events</h2>
+<p class="page-subtitle">Pick an event, choose your seats, and get your digital ticket.</p>
+
+{% if events %}
+<div>
+    {% for ev in events %}
+    <a href="{{ url_for('book_event', event_id=ev.id) }}" class="card card-clickable animate-in" style="display:block;animation-delay:{{ loop.index0 * 0.06 }}s">
+        <div class="event-card">
+            <div>
+                <h3 class="event-title">{{ ev.title }}</h3>
+                <p class="event-meta">{{ ev.event_date|fmtdate }} · {{ ev.event_time|fmttime }} · {{ ev.venue_name or '—' }}</p>
+                {% if ev.organizer_name %}
+                <p style="font-size:11px;color:var(--text-muted);margin-top:3px">by {{ ev.organizer_name }}</p>
+                {% endif %}
+            </div>
+            <div style="text-align:right">
+                <span style="font-size:18px;font-weight:700;color:var(--accent-gold);font-family:var(--font-mono)">
+                    {{ "{:,.0f}".format(ev.price) }} TZS
+                </span>
+                {% set remaining = (ev.capacity or 0) - ev.booked %}
+                <p style="font-size:12px;margin-top:4px;color:{% if remaining > 0 %}var(--accent-teal){% else %}var(--accent-red){% endif %}">
+                    {{ remaining }} seats left
+                </p>
+                <div class="progress-bar" style="margin-top:4px">
+                    <div class="progress-fill" style="width:{{ ((ev.booked / ev.capacity * 100) if ev.capacity else 0)|int }}%"></div>
+                </div>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">No events available right now. Check back soon!</div>
+{% endif %}
+{% endblock %}

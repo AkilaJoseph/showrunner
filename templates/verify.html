@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Verify Ticket — ShowRunner{% endblock %}
+{% block content %}
+<h2 class="page-title">Verify Ticket</h2>
+<p class="page-subtitle">Enter the ticket code shown by the guest to verify their booking.</p>
+
+<div class="form-card" style="max-width:500px;margin:0 auto">
+    <form method="POST" action="{{ url_for('org_verify_ticket') }}">
+        <div class="field">
+            <label for="code">Ticket Code</label>
+            <input type="text" id="code" name="code" class="verify-input"
+                   placeholder="ABCD-EFGH-JKLM" maxlength="14"
+                   value="{{ code_input or '' }}"
+                   oninput="formatVerifyInput(this)"
+                   autocomplete="off" autofocus>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">Verify Ticket</button>
+    </form>
+
+    {% if result %}
+    <div class="verify-result
+        {% if result.status == 'success' %}verify-success
+        {% elif result.status == 'already' %}verify-already
+        {% else %}verify-invalid{% endif %}">
+
+        {% if result.status == 'invalid' %}
+            <div class="verify-icon">✗</div>
+            <p class="verify-title">Invalid Ticket</p>
+            <p class="verify-message">This code doesn't match any booking for your events.</p>
+
+        {% elif result.status == 'already' %}
+            <div class="verify-icon">⚠</div>
+            <p class="verify-title">Already Verified</p>
+            <p class="verify-message">This ticket was already used for entry.</p>
+
+            <div class="verify-details">
+                <div><span class="label">Name:</span> <strong>{{ result.booking.customer_name }}</strong></div>
+                <div><span class="label">Phone:</span> <strong>{{ result.booking.customer_phone }}</strong></div>
+                <div><span class="label">Event:</span> <strong>{{ result.booking.event_title }}</strong></div>
+                <div><span class="label">Seats:</span> <strong style="color:var(--accent-gold)">{{ result.booking.seats }}</strong></div>
+            </div>
+
+        {% else %}
+            <div class="verify-icon">✓</div>
+            <p class="verify-title">Ticket Valid!</p>
+            <p class="verify-message">Entry granted. Welcome!</p>
+
+            <div class="verify-details">
+                <div><span class="label">Name:</span> <strong>{{ result.booking.customer_name }}</strong></div>
+                <div><span class="label">Phone:</span> <strong>{{ result.booking.customer_phone }}</strong></div>
+                <div><span class="label">Event:</span> <strong>{{ result.booking.event_title }}</strong></div>
+                <div><span class="label">Seats:</span> <strong style="color:var(--accent-gold)">{{ result.booking.seats }}</strong></div>
+                <div><span class="label">Date:</span> <strong>{{ result.booking.event_date|fmtdate }}</strong></div>
+                <div><span class="label">Time:</span> <strong>{{ result.booking.event_time|fmttime }}</strong></div>
+            </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

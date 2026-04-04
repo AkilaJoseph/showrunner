@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Bookings — ShowRunner{% endblock %}
+{% block content %}
+<h2 class="page-title">All Bookings</h2>
+
+{% if bookings %}
+<div>
+    {% for b in bookings %}
+    <a href="{{ url_for('view_ticket', booking_id=b.id) }}" class="booking-row booking-row-clickable animate-in" style="animation-delay:{{ loop.index0 * 0.04 }}s">
+        <div>
+            <p class="booking-name">{{ b.customer_name }}</p>
+            <p class="booking-detail">{{ b.event_title or '—' }} · {{ b.seats }} · {{ b.customer_phone }}</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="booking-code">{{ b.code }}</span>
+            <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}">
+                {% if b.verified %}VERIFIED{% else %}PENDING{% endif %}
+            </span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">No bookings yet.</div>
+{% endif %}
+{% endblock %}

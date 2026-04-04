@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('org_events_list') }}" class="btn-back">← Back to Events</a>
+
+<!-- Event Info -->
+<div class="card">
+    <div class="detail-header">
+        <div>
+            <h2 style="font-size:24px;font-weight:700;color:#fff;font-family:var(--font-mono)">{{ event.title }}</h2>
+            <p style="color:var(--text-secondary);margin-top:4px">{{ event.description or 'No description' }}</p>
+            <div class="tags" style="margin-top:12px">
+                <span class="tag">📅 {{ event.event_date|fmtdate }}</span>
+                <span class="tag">🕐 {{ event.event_time|fmttime }}</span>
+                <span class="tag">📍 {{ event.venue_name or '—' }}</span>
+                <span class="tag tag-gold">💰 {{ "{:,.0f}".format(event.price) }} TZS</span>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('org_delete_event', event_id=event.id) }}"
+              onsubmit="return confirm('Delete this event and all its bookings?')">
+            <button type="submit" class="btn btn-danger">Delete Event</button>
+        </form>
+    </div>
+</div>
+
+<!-- Seat Map -->
+<div class="card">
+    <h3 class="section-title">Seat Map — {{ booked_seats|length }}/{{ event.capacity }} booked</h3>
+    <div class="seat-map-container" id="seat-map"></div>
+</div>
+
+<!-- Bookings -->
+<div class="card">
+    <h3 class="section-title">Bookings ({{ bookings|length }})</h3>
+    {% if bookings %}
+    <div>
+        {% for b in bookings %}
+        <a href="{{ url_for('view_ticket', booking_id=b.id) }}" class="booking-row booking-row-clickable">
+            <div>
+                <p class="booking-name">{{ b.customer_name }}</p>
+                <p class="booking-detail">{{ b.customer_phone }} · Seats: {{ b.seats }}</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+                <span class="booking-code">{{ b.code }}</span>
+                <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}">
+                    {% if b.verified %}VERIFIED{% else %}PENDING{% endif %}
+                </span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No bookings yet for this event.</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const bookedSeats = {{ booked_seats|tojson }};
+    buildSeatMap("seat-map", {
+        rows: {{ event.rows }},
+        seatsPerRow: {{ event.seats_per_row }},
+        bookedSeats: bookedSeats,
+        selectable: false,
+    });
+</script>
+{% endblock %}

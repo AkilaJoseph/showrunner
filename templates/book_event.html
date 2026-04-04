@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Book — {{ event.title }} — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('book_list') }}" class="btn-back">← Back to Events</a>
+
+<!-- Event Info -->
+<div class="card">
+    <h3 style="font-size:18px;font-weight:700;color:#fff">{{ event.title }}</h3>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:4px">
+        {{ event.event_date|fmtdate }} · {{ event.event_time|fmttime }} · {{ event.venue_name }}
+    </p>
+    {% if event.organizer_name %}
+    <p style="font-size:11px;color:var(--text-muted);margin-top:3px">by {{ event.organizer_name }}</p>
+    {% endif %}
+    <p style="font-size:16px;font-weight:700;color:var(--accent-gold);margin-top:8px;font-family:var(--font-mono)">
+        {{ "{:,.0f}".format(event.price) }} TZS / seat
+    </p>
+</div>
+
+<!-- Seat Map -->
+<div class="card">
+    <h3 class="section-title">Select Your Seats</h3>
+    <div class="seat-map-container" id="seat-map"></div>
+    <div id="selection-info" class="selection-info" style="display:none"></div>
+</div>
+
+<!-- Booking Form -->
+<form method="POST" class="form-card" id="booking-form">
+    <h3 class="section-title">Your Details</h3>
+
+    <input type="hidden" name="selected_seats" id="selected_seats" value="">
+
+    <div class="field">
+        <label for="customer_name">Full Name *</label>
+        <input type="text" id="customer_name" name="customer_name"
+               value="{{ current_user.name if current_user else '' }}"
+               placeholder="e.g. John Doe" required>
+    </div>
+    <div class="field">
+        <label for="customer_phone">Phone *</label>
+        <input type="tel" id="customer_phone" name="customer_phone"
+               value="{{ current_user.phone if current_user else '' }}"
+               placeholder="+255 7XX XXX XXX" required>
+    </div>
+    <div class="field">
+        <label for="customer_email">Email (optional)</label>
+        <input type="email" id="customer_email" name="customer_email"
+               value="{{ current_user.email if current_user else '' }}"
+               placeholder="john@email.com">
+    </div>
+
+    <button type="submit" id="book-submit-btn" class="btn btn-primary btn-full" disabled>
+        Select seats to book
+    </button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const bookedSeats = {{ booked_seats|tojson }};
+    const ticketPrice = {{ event.price }};
+
+    buildSeatMap("seat-map", {
+        rows: {{ event.rows }},
+        seatsPerRow: {{ event.seats_per_row }},
+        bookedSeats: bookedSeats,
+        selectable: true,
+        price: ticketPrice,
+    });
+
+    document.getElementById("booking-form").addEventListener("submit", function(e) {
+        const seats = document.getElementById("selected_seats").value;
+        if (!seats) {
+            e.preventDefault();
+            alert("Please select at least one seat.");
+        }
+    });
+</script>
+{% endblock %}

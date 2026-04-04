@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ShowRunner{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Toast Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="toast-container">
+        {% for category, message in messages %}
+        <div class="toast toast-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Header -->
+    <header class="header">
+        {% if current_organizer %}
+        <a href="{{ url_for('org_dashboard') }}" class="header-brand">
+        {% else %}
+        <a href="{{ url_for('book_list') }}" class="header-brand">
+        {% endif %}
+            <div class="header-icon">🎤</div>
+            <div>
+                <h1 class="header-title">ShowRunner</h1>
+                {% if current_organizer %}
+                <p class="header-sub">{{ current_organizer.org_name | upper }}</p>
+                {% else %}
+                <p class="header-sub">EVENT & TICKET MANAGER</p>
+                {% endif %}
+            </div>
+        </a>
+
+        {% if current_organizer %}
+        <!-- Organizer role pill -->
+        <div style="margin-left:auto">
+            <span class="role-pill role-pill-org">Organizer</span>
+        </div>
+        {% elif current_user %}
+        <div style="margin-left:auto">
+            <span class="role-pill role-pill-user">{{ current_user.name }}</span>
+        </div>
+        {% endif %}
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        {% if current_organizer %}
+        <!-- Organizer nav -->
+        <a href="{{ url_for('org_dashboard') }}" class="nav-item {% if request.endpoint == 'org_dashboard' %}active{% endif %}">
+            <span class="nav-icon">◆</span> Dashboard
+        </a>
+        <a href="{{ url_for('org_events_list') }}" class="nav-item {% if request.endpoint in ['org_events_list','org_create_event','org_event_detail'] %}active{% endif %}">
+            <span class="nav-icon">★</span> Events
+        </a>
+        <a href="{{ url_for('org_venues_list') }}" class="nav-item {% if request.endpoint in ['org_venues_list','org_create_venue'] %}active{% endif %}">
+            <span class="nav-icon">▣</span> Venues
+        </a>
+        <a href="{{ url_for('org_bookings_list') }}" class="nav-item {% if request.endpoint == 'org_bookings_list' %}active{% endif %}">
+            <span class="nav-icon">◈</span> Bookings
+        </a>
+        <a href="{{ url_for('org_verify_ticket') }}" class="nav-item {% if request.endpoint == 'org_verify_ticket' %}active{% endif %}">
+            <span class="nav-icon">✓</span> Verify
+        </a>
+        <a href="{{ url_for('org_logout') }}" class="nav-item nav-item-logout">
+            <span class="nav-icon">→</span> Logout
+        </a>
+        {% else %}
+        <!-- Public / user nav -->
+        <a href="{{ url_for('book_list') }}" class="nav-item {% if request.endpoint in ['book_list','book_event'] %}active{% endif %}">
+            <span class="nav-icon">♦</span> Browse Events
+        </a>
+        {% if current_user %}
+        <a href="{{ url_for('user_logout') }}" class="nav-item nav-item-logout" style="margin-left:auto">
+            <span class="nav-icon">→</span> Logout
+        </a>
+        {% else %}
+        <a href="{{ url_for('user_login') }}" class="nav-item {% if request.endpoint == 'user_login' %}active{% endif %}" style="margin-left:auto">
+            <span class="nav-icon">↗</span> Log in
+        </a>
+        <a href="{{ url_for('user_register') }}" class="nav-item {% if request.endpoint == 'user_register' %}active{% endif %}">
+            Register
+        </a>
+        <a href="{{ url_for('org_login') }}" class="nav-item nav-item-org">
+            Organizer Portal
+        </a>
+        {% endif %}
+        {% endif %}
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

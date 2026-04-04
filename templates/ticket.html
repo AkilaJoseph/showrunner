@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Your Ticket — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('book_list') }}" class="btn-back">← Browse Events</a>
+
+<div class="ticket-wrapper">
+    <div class="ticket">
+        <!-- Top Section -->
+        <div class="ticket-top">
+            <p class="ticket-label">DIGITAL TICKET</p>
+            <h2 class="ticket-event-title">{{ event.title if event else '—' }}</h2>
+            <p class="ticket-event-meta">
+                {% if event %}{{ event.event_date|fmtdate }} · {{ event.event_time|fmttime }}{% else %}—{% endif %}
+            </p>
+            <p class="ticket-venue">📍 {{ event.venue_name if event else '—' }}</p>
+            {% if event and event.organizer_name %}
+            <p style="font-size:11px;color:var(--text-muted);margin-top:4px">{{ event.organizer_name }}</p>
+            {% endif %}
+        </div>
+
+        <!-- QR Code -->
+        <div class="ticket-qr">
+            <div class="ticket-qr-inner">
+                <img src="data:image/png;base64,{{ qr_base64 }}" alt="Ticket QR Code">
+            </div>
+        </div>
+
+        <!-- Ticket Code -->
+        <div class="ticket-code-section">
+            <p class="ticket-code-label">TICKET CODE</p>
+            <p class="ticket-code-value">{{ booking.code }}</p>
+        </div>
+
+        <!-- Divider -->
+        <div class="ticket-divider">
+            <div class="ticket-notch-left"></div>
+            <div class="ticket-dash"></div>
+            <div class="ticket-notch-right"></div>
+        </div>
+
+        <!-- Bottom Section -->
+        <div class="ticket-bottom">
+            <div class="ticket-details">
+                <div>
+                    <p class="ticket-field-label">NAME</p>
+                    <p class="ticket-field-value">{{ booking.customer_name }}</p>
+                </div>
+                <div>
+                    <p class="ticket-field-label">PHONE</p>
+                    <p class="ticket-field-value">{{ booking.customer_phone }}</p>
+                </div>
+                <div>
+                    <p class="ticket-field-label">SEATS</p>
+                    <p class="ticket-field-value gold">{{ booking.seats }}</p>
+                </div>
+                <div>
+                    <p class="ticket-field-label">TOTAL</p>
+                    <p class="ticket-field-value teal">{{ "{:,.0f}".format(booking.total_amount) }} TZS</p>
+                </div>
+            </div>
+
+            <div class="ticket-status {% if booking.verified %}ticket-status-verified{% else %}ticket-status-pending{% endif %}">
+                {% if booking.verified %}
+                    ✓ VERIFIED — ENTRY GRANTED
+                {% else %}
+                    ⏳ SHOW THIS AT THE ENTRANCE
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <p class="ticket-hint">Screenshot this ticket or show the QR code at the entrance</p>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Create Organizer Account — ShowRunner{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">🎤</div>
+        <h2 class="auth-title">Create Organizer Account</h2>
+        <p class="auth-sub">Set up your event management workspace</p>
+
+        <form method="POST">
+            <div class="field">
+                <label for="org_name">Organization / Brand Name *</label>
+                <input type="text" id="org_name" name="org_name"
+                       placeholder="e.g. Mikumi Comedy Productions" required autofocus>
+            </div>
+            <div class="form-row">
+                <div class="field">
+                    <label for="name">Your Full Name *</label>
+                    <input type="text" id="name" name="name" placeholder="e.g. Jane Doe" required>
+                </div>
+                <div class="field">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                </div>
+            </div>
+            <div class="field">
+                <label for="password">Password *</label>
+                <input type="password" id="password" name="password"
+                       placeholder="At least 6 characters" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px">
+                Create Account
+            </button>
+        </form>
+
+        <p class="auth-footer">
+            Already have an account?
+            <a href="{{ url_for('org_login') }}" style="color:var(--accent-gold)">Log in</a>
+        </p>
+        <p class="auth-footer" style="margin-top:6px">
+            Not an organizer?
+            <a href="{{ url_for('user_register') }}" style="color:var(--text-secondary)">Register as a user</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

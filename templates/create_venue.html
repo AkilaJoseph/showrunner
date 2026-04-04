@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Add Venue — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('org_venues_list') }}" class="btn-back">← Back to Venues</a>
+<h2 class="page-title">Add Venue</h2>
+
+<form method="POST" class="form-card">
+    <div class="field">
+        <label for="name">Venue Name *</label>
+        <input type="text" id="name" name="name" placeholder="e.g. Downtown Comedy Club" required>
+    </div>
+    <div class="field">
+        <label for="location">Location *</label>
+        <input type="text" id="location" name="location" placeholder="e.g. Masaki, Dar es Salaam" required>
+    </div>
+    <div class="form-row">
+        <div class="field">
+            <label for="rows">Rows</label>
+            <input type="number" id="rows" name="rows" value="5" min="1" max="26" required
+                   oninput="updateCapacity()">
+        </div>
+        <div class="field">
+            <label for="seats_per_row">Seats per Row</label>
+            <input type="number" id="seats_per_row" name="seats_per_row" value="8" min="1" max="30" required
+                   oninput="updateCapacity()">
+        </div>
+    </div>
+    <p class="form-hint" id="capacity-hint">Total capacity: 40 seats</p>
+
+    <button type="submit" class="btn btn-primary btn-full">Add Venue</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateCapacity() {
+    const rows = parseInt(document.getElementById("rows").value) || 0;
+    const spr = parseInt(document.getElementById("seats_per_row").value) || 0;
+    document.getElementById("capacity-hint").textContent = `Total capacity: ${rows * spr} seats`;
+}
+</script>
+{% endblock %}

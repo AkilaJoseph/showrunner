@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ShowRunner{% endblock %}
+{% block content %}
+<h2 class="page-title">Dashboard</h2>
+
+<div class="stats-grid">
+    <div class="stat-card animate-in" style="animation-delay: 0s">
+        <p class="stat-label">Total Events</p>
+        <p class="stat-value stat-purple">{{ stats.total_events }}</p>
+    </div>
+    <div class="stat-card animate-in" style="animation-delay: 0.06s">
+        <p class="stat-label">Upcoming</p>
+        <p class="stat-value stat-gold">{{ stats.upcoming }}</p>
+    </div>
+    <div class="stat-card animate-in" style="animation-delay: 0.12s">
+        <p class="stat-label">Bookings</p>
+        <p class="stat-value stat-teal">{{ stats.total_bookings }}</p>
+    </div>
+    <div class="stat-card animate-in" style="animation-delay: 0.18s">
+        <p class="stat-label">Revenue</p>
+        <p class="stat-value stat-red">{{ stats.total_revenue }} <span style="font-size:12px;color:var(--text-secondary)">TZS</span></p>
+    </div>
+    <div class="stat-card animate-in" style="animation-delay: 0.24s">
+        <p class="stat-label">Verified</p>
+        <p class="stat-value stat-green">{{ stats.verified }}</p>
+    </div>
+</div>
+
+<h3 class="section-title">Recent Bookings</h3>
+
+{% if recent_bookings %}
+<div>
+    {% for b in recent_bookings %}
+    <a href="{{ url_for('view_ticket', booking_id=b.id) }}" class="booking-row booking-row-clickable">
+        <div>
+            <p class="booking-name">{{ b.customer_name }}</p>
+            <p class="booking-detail">{{ b.event_title or '—' }} · {{ b.seats }}</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+            <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}">
+                {% if b.verified %}✓ Verified{% else %}Pending{% endif %}
+            </span>
+            <span class="booking-code">{{ b.code }}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    No bookings yet. <a href="{{ url_for('org_create_event') }}" style="color:var(--accent-gold)">Create an event</a> and start selling!
+</div>
+{% endif %}
+{% endblock %}

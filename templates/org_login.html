@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Organizer Login — ShowRunner{% endblock %}
+{% block content %}
+<div class="auth-page">
+    <div class="auth-card">
+        <div class="auth-logo">🎤</div>
+        <h2 class="auth-title">Organizer Portal</h2>
+        <p class="auth-sub">Manage your events, venues and ticket verification</p>
+
+        <form method="POST">
+            <div class="field">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email"
+                       placeholder="you@example.com" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password"
+                       placeholder="Your password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-full" style="margin-top:8px">
+                Log In
+            </button>
+        </form>
+
+        <p class="auth-footer">
+            No account yet?
+            <a href="{{ url_for('org_register') }}" style="color:var(--accent-gold)">Create one</a>
+        </p>
+        <p class="auth-footer" style="margin-top:6px">
+            Looking to buy tickets?
+            <a href="{{ url_for('book_list') }}" style="color:var(--text-secondary)">Browse events</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

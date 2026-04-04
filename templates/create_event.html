@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Create Event — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('org_events_list') }}" class="btn-back">← Back to Events</a>
+<h2 class="page-title">Create Event</h2>
+
+{% if not venues %}
+<div class="empty-state" style="margin-bottom:20px">
+    You need to <a href="{{ url_for('org_create_venue') }}" style="color:var(--accent-gold)">add a venue</a> before creating an event.
+</div>
+{% endif %}
+
+<form method="POST" class="form-card">
+    <div class="field">
+        <label for="title">Event Title *</label>
+        <input type="text" id="title" name="title" placeholder="e.g. Comedy Night Live" required>
+    </div>
+
+    <div class="field">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" placeholder="Tell people about this show..."></textarea>
+    </div>
+
+    <div class="form-row">
+        <div class="field">
+            <label for="event_date">Date *</label>
+            <input type="date" id="event_date" name="event_date" required>
+        </div>
+        <div class="field">
+            <label for="event_time">Time *</label>
+            <input type="time" id="event_time" name="event_time" required>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="field">
+            <label for="venue_id">Venue *</label>
+            <select id="venue_id" name="venue_id" required {% if not venues %}disabled{% endif %}>
+                <option value="">Select venue</option>
+                {% for v in venues %}
+                <option value="{{ v.id }}">{{ v.name }} ({{ v.capacity }} seats)</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="field">
+            <label for="price">Ticket Price (TZS) *</label>
+            <input type="number" id="price" name="price" placeholder="e.g. 15000" min="0" step="500" required>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full" {% if not venues %}disabled{% endif %}>Create Event</button>
+</form>
+{% endblock %}
