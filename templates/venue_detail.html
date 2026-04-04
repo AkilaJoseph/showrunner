@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ venue.name }} — ShowRunner{% endblock %}
+{% block content %}
+<a href="{{ url_for('org_venues_list') }}" class="btn-back">← Back to Venues</a>
+
+<!-- Venue Info -->
+<div class="card" style="margin-bottom:20px">
+    <div class="detail-header">
+        <div>
+            <h2 class="page-title" style="margin-bottom:4px">{{ venue.name }}</h2>
+            <p style="color:var(--accent-purple);font-size:13px">📍 {{ venue.location }}</p>
+            <div class="tags" style="margin-top:10px">
+                <span class="tag">{{ venue.rows }} rows</span>
+                <span class="tag">{{ venue.seats_per_row }} seats / row</span>
+                <span class="tag tag-gold">{{ venue.capacity }} total seats</span>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('org_delete_venue', venue_id=venue.id) }}"
+              onsubmit="return confirm('Delete this venue? This cannot be undone.')">
+            <button class="btn btn-danger">Delete Venue</button>
+        </form>
+    </div>
+</div>
+
+<!-- Seat Map -->
+<div class="card" style="margin-bottom:20px">
+    <p class="section-title">Seat Layout</p>
+    <div class="seat-map-container" id="seat-map"></div>
+</div>
+
+<!-- ── Venue Photos ── -->
+<div class="card">
+    <div class="page-header" style="margin-bottom:16px">
+        <p class="section-title" style="margin-bottom:0">Venue Photos
+            <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
+                Help guests feel the vibe before they arrive
+            </span>
+        </p>
+    </div>
+
+    {% if photos %}
+    <div class="photo-grid">
+        {% for p in photos %}
+        <div class="photo-item">
+            <img src="{{ url_for('static', filename=p.filename) }}" alt="{{ p.caption or venue.name }}">
+            {% if p.caption %}<p class="photo-caption">{{ p.caption }}</p>{% endif %}
+            <form method="POST" action="{{ url_for('org_delete_venue_photo', venue_id=venue.id, photo_id=p.id) }}"
+                  class="photo-delete-form" onsubmit="return confirm('Remove this photo?')">
+                <button type="submit" class="photo-delete-btn">✕</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-bottom:20px">No photos yet — upload some to show guests how beautiful this venue is!</div>
+    {% endif %}
+
+    <!-- Upload Form -->
+    <form method="POST" action="{{ url_for('org_add_venue_photo', venue_id=venue.id) }}"
+          enctype="multipart/form-data" class="upload-zone" id="venue-upload-zone">
+        <div class="upload-zone-inner" onclick="document.getElementById('venue-photo-input').click()">
+            <div class="upload-icon">📷</div>
+            <p class="upload-label">Click to choose a photo</p>
+            <p class="upload-hint">PNG, JPG, GIF or WEBP</p>
+            <input type="file" id="venue-photo-input" name="photo" accept="image/*"
+                   style="display:none" onchange="previewAndSubmitLabel(this,'venue-upload-zone')">
+        </div>
+        <div class="field" style="margin-top:12px;margin-bottom:0">
+            <label for="venue-caption">Caption (optional)</label>
+            <input type="text" id="venue-caption" name="caption" placeholder="e.g. Main hall on show night">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px">Upload Photo</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+buildSeatMap("seat-map", {
+    rows: {{ venue.rows }},
+    seatsPerRow: {{ venue.seats_per_row }},
+    bookedSeats: [],
+    selectable: false,
+});
+
+function previewAndSubmitLabel(input, zoneId) {
+    const zone = document.getElementById(zoneId);
+    if (input.files && input.files[0]) {
+        zone.querySelector('.upload-label').textContent = input.files[0].name;
+    }
+}
+</script>
+{% endblock %}

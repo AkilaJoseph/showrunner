@@ -7,7 +7,7 @@
 <div class="card">
     <div class="detail-header">
         <div>
-            <h2 style="font-size:24px;font-weight:700;color:#fff;font-family:var(--font-mono)">{{ event.title }}</h2>
+            <h2 style="font-family:var(--font-display);font-size:30px;letter-spacing:1px;color:#fff">{{ event.title }}</h2>
             <p style="color:var(--text-secondary);margin-top:4px">{{ event.description or 'No description' }}</p>
             <div class="tags" style="margin-top:12px">
                 <span class="tag">📅 {{ event.event_date|fmtdate }}</span>
@@ -23,15 +23,114 @@
     </div>
 </div>
 
-<!-- Seat Map -->
+<!-- ── Performers ── -->
 <div class="card">
-    <h3 class="section-title">Seat Map — {{ booked_seats|length }}/{{ event.capacity }} booked</h3>
+    <p class="section-title">Lineup / Performers</p>
+
+    {% if performers %}
+    <div class="performers-grid">
+        {% for p in performers %}
+        <div class="performer-card">
+            {% if p.photo %}
+            <img src="{{ url_for('static', filename=p.photo) }}" alt="{{ p.name }}" class="performer-photo">
+            {% else %}
+            <div class="performer-photo performer-photo-placeholder">🎤</div>
+            {% endif %}
+            <div class="performer-info">
+                <p class="performer-name">{{ p.name }}</p>
+                {% if p.role %}<p class="performer-role">{{ p.role }}</p>{% endif %}
+                {% if p.bio  %}<p class="performer-bio">{{ p.bio }}</p>{% endif %}
+            </div>
+            <form method="POST"
+                  action="{{ url_for('org_delete_performer', event_id=event.id, performer_id=p.id) }}"
+                  onsubmit="return confirm('Remove {{ p.name }}?')" style="margin-top:8px">
+                <button type="submit" class="btn btn-danger" style="width:100%;justify-content:center;font-size:11px">Remove</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Add Performer -->
+    <details class="upload-details" {% if not performers %}open{% endif %}>
+        <summary class="upload-details-summary">+ Add Performer</summary>
+        <form method="POST" action="{{ url_for('org_add_performer', event_id=event.id) }}"
+              enctype="multipart/form-data" style="margin-top:14px">
+            <div class="form-row">
+                <div class="field">
+                    <label>Name *</label>
+                    <input type="text" name="name" placeholder="e.g. Daniel Msambwa" required>
+                </div>
+                <div class="field">
+                    <label>Role</label>
+                    <input type="text" name="role" placeholder="e.g. Comedian, MC, Singer">
+                </div>
+            </div>
+            <div class="field">
+                <label>Short Bio</label>
+                <textarea name="bio" placeholder="A quick hype line about this performer..." style="min-height:60px"></textarea>
+            </div>
+            <div class="field">
+                <label>Photo</label>
+                <input type="file" name="photo" accept="image/*" class="file-input-plain">
+            </div>
+            <button type="submit" class="btn btn-primary">Add to Lineup</button>
+        </form>
+    </details>
+</div>
+
+<!-- ── Event Gallery (Branding) ── -->
+<div class="card">
+    <p class="section-title">Event Gallery
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
+            Moments from past shows — builds hype for ticket buyers
+        </span>
+    </p>
+
+    {% if photos %}
+    <div class="photo-grid">
+        {% for p in photos %}
+        <div class="photo-item">
+            <img src="{{ url_for('static', filename=p.filename) }}" alt="{{ p.caption or event.title }}">
+            {% if p.caption %}<p class="photo-caption">{{ p.caption }}</p>{% endif %}
+            <form method="POST"
+                  action="{{ url_for('org_delete_event_photo', event_id=event.id, photo_id=p.id) }}"
+                  class="photo-delete-form" onsubmit="return confirm('Remove this photo?')">
+                <button type="submit" class="photo-delete-btn">✕</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-bottom:16px">No gallery photos yet — upload shots from a previous show to excite ticket buyers!</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('org_add_event_photo', event_id=event.id) }}"
+          enctype="multipart/form-data" class="upload-zone" id="event-upload-zone">
+        <div class="upload-zone-inner" onclick="document.getElementById('event-photo-input').click()">
+            <div class="upload-icon">🖼️</div>
+            <p class="upload-label">Click to choose a photo</p>
+            <p class="upload-hint">PNG, JPG, GIF or WEBP</p>
+            <input type="file" id="event-photo-input" name="photo" accept="image/*"
+                   style="display:none" onchange="previewLabel(this,'event-upload-zone')">
+        </div>
+        <div class="field" style="margin-top:12px;margin-bottom:0">
+            <label>Caption (optional)</label>
+            <input type="text" name="caption" placeholder="e.g. The crowd going wild at Mikumi 2024">
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px">Upload Photo</button>
+    </form>
+</div>
+
+<!-- ── Seat Map ── -->
+<div class="card">
+    <p class="section-title">Seat Map — {{ booked_seats|length }}/{{ event.capacity }} booked</p>
     <div class="seat-map-container" id="seat-map"></div>
 </div>
 
-<!-- Bookings -->
+<!-- ── Bookings ── -->
 <div class="card">
-    <h3 class="section-title">Bookings ({{ bookings|length }})</h3>
+    <p class="section-title">Bookings ({{ bookings|length }})</p>
     {% if bookings %}
     <div>
         {% for b in bookings %}
@@ -50,19 +149,23 @@
         {% endfor %}
     </div>
     {% else %}
-    <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No bookings yet for this event.</p>
+    <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:16px">No bookings yet.</p>
     {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    const bookedSeats = {{ booked_seats|tojson }};
-    buildSeatMap("seat-map", {
-        rows: {{ event.rows }},
-        seatsPerRow: {{ event.seats_per_row }},
-        bookedSeats: bookedSeats,
-        selectable: false,
-    });
+buildSeatMap("seat-map", {
+    rows: {{ event.rows }},
+    seatsPerRow: {{ event.seats_per_row }},
+    bookedSeats: {{ booked_seats|tojson }},
+    selectable: false,
+});
+function previewLabel(input, zoneId) {
+    if (input.files && input.files[0]) {
+        document.querySelector('#' + zoneId + ' .upload-label').textContent = input.files[0].name;
+    }
+}
 </script>
 {% endblock %}

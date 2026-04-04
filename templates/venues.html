@@ -7,43 +7,29 @@
 </div>
 
 {% if venues %}
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
     {% for v in venues %}
-    <div class="card animate-in" style="animation-delay:{{ loop.index0 * 0.08 }}s">
+    <a href="{{ url_for('org_venue_detail', venue_id=v.id) }}" class="card card-clickable animate-in"
+       style="display:block;animation-delay:{{ loop.index0 * 0.08 }}s">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
-                <h3 style="font-size:16px;font-weight:700;color:#fff">{{ v.name }}</h3>
-                <p style="font-size:12px;color:var(--accent-purple);margin-top:2px">📍 {{ v.location }}</p>
+                <h3 style="font-family:var(--font-display);font-size:20px;color:#fff;letter-spacing:0.5px">{{ v.name }}</h3>
+                <p style="font-size:12px;color:var(--accent-purple);margin-top:3px">📍 {{ v.location }}</p>
             </div>
-            <form method="POST" action="{{ url_for('org_delete_venue', venue_id=v.id) }}"
-                  onsubmit="return confirm('Delete this venue?')">
-                <button type="submit" style="background:none;border:none;color:#ff6b6b55;cursor:pointer;font-size:16px"
-                        onmouseover="this.style.color='#ff6b6b'" onmouseout="this.style.color='#ff6b6b55'">✕</button>
-            </form>
+            <span class="tag tag-gold" style="flex-shrink:0;margin-left:8px">{{ v.capacity }} seats</span>
         </div>
-        <div class="tags">
+        <div class="tags" style="margin-top:10px">
             <span class="tag">{{ v.rows }} rows</span>
-            <span class="tag">{{ v.seats_per_row }} seats/row</span>
-            <span class="tag tag-gold">{{ v.capacity }} total</span>
+            <span class="tag">{{ v.seats_per_row }} / row</span>
         </div>
-        <div class="seat-map-container" id="venue-map-{{ v.id }}" style="margin-top:16px"></div>
-    </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:12px">Click to manage photos & details →</p>
+    </a>
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state">No venues added yet.</div>
+<div class="empty-state">
+    No venues added yet.
+    <br><a href="{{ url_for('org_create_venue') }}" style="color:var(--accent-gold)">Add your first venue</a>
+</div>
 {% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-    {% for v in venues %}
-    buildSeatMap("venue-map-{{ v.id }}", {
-        rows: {{ v.rows }},
-        seatsPerRow: {{ v.seats_per_row }},
-        bookedSeats: [],
-        selectable: false,
-    });
-    {% endfor %}
-</script>
 {% endblock %}

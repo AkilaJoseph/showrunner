@@ -3,31 +3,83 @@
 {% block content %}
 <a href="{{ url_for('book_list') }}" class="btn-back">← Back to Events</a>
 
-<!-- Event Info -->
-<div class="card">
-    <h3 style="font-size:18px;font-weight:700;color:#fff">{{ event.title }}</h3>
-    <p style="font-size:12px;color:var(--text-secondary);margin-top:4px">
-        {{ event.event_date|fmtdate }} · {{ event.event_time|fmttime }} · {{ event.venue_name }}
+<!-- ── Hero ── -->
+<div class="card" style="background:linear-gradient(135deg,#13132a,#1a1238,#13132a);border-color:#2a2a50;margin-bottom:22px">
+    <h2 style="font-family:var(--font-display);font-size:38px;letter-spacing:1px;color:#fff;line-height:1.1">{{ event.title }}</h2>
+    <p style="font-size:13px;color:var(--text-secondary);margin-top:6px">
+        {{ event.event_date|fmtdate }} &nbsp;·&nbsp; {{ event.event_time|fmttime }} &nbsp;·&nbsp; {{ event.venue_name }}
     </p>
     {% if event.organizer_name %}
-    <p style="font-size:11px;color:var(--text-muted);margin-top:3px">by {{ event.organizer_name }}</p>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:3px">Presented by {{ event.organizer_name }}</p>
     {% endif %}
-    <p style="font-size:16px;font-weight:700;color:var(--accent-gold);margin-top:8px;font-family:var(--font-mono)">
-        {{ "{:,.0f}".format(event.price) }} TZS / seat
+    <p style="font-family:var(--font-display);font-size:28px;color:var(--accent-gold);margin-top:14px;letter-spacing:1px">
+        {{ "{:,.0f}".format(event.price) }} <span style="font-size:14px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
     </p>
 </div>
 
-<!-- Seat Map -->
-<div class="card">
-    <h3 class="section-title">Select Your Seats</h3>
+<!-- ── Performers / Lineup ── -->
+{% if performers %}
+<div class="card" style="margin-bottom:22px">
+    <p class="section-title">🎭 Tonight's Lineup</p>
+    <div class="performers-grid">
+        {% for p in performers %}
+        <div class="performer-card performer-card-public">
+            {% if p.photo %}
+            <img src="{{ url_for('static', filename=p.photo) }}" alt="{{ p.name }}" class="performer-photo">
+            {% else %}
+            <div class="performer-photo performer-photo-placeholder">🎤</div>
+            {% endif %}
+            <div class="performer-info">
+                <p class="performer-name">{{ p.name }}</p>
+                {% if p.role %}<p class="performer-role">{{ p.role }}</p>{% endif %}
+                {% if p.bio  %}<p class="performer-bio">{{ p.bio }}</p>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Event Gallery ── -->
+{% if event_photos %}
+<div class="card" style="margin-bottom:22px">
+    <p class="section-title">📸 From Previous Shows</p>
+    <div class="photo-grid photo-grid-public">
+        {% for p in event_photos %}
+        <div class="photo-item photo-item-public">
+            <img src="{{ url_for('static', filename=p.filename) }}" alt="{{ p.caption or event.title }}">
+            {% if p.caption %}<p class="photo-caption">{{ p.caption }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Seat Map ── -->
+<div class="card" style="margin-bottom:22px">
+    <p class="section-title">🪑 Select Your Seats</p>
     <div class="seat-map-container" id="seat-map"></div>
     <div id="selection-info" class="selection-info" style="display:none"></div>
 </div>
 
-<!-- Booking Form -->
-<form method="POST" class="form-card" id="booking-form">
-    <h3 class="section-title">Your Details</h3>
+<!-- ── Venue Photos ── -->
+{% if venue_photos %}
+<div class="card" style="margin-bottom:22px">
+    <p class="section-title">🏟️ The Venue — {{ event.venue_name }}</p>
+    <div class="photo-grid photo-grid-public">
+        {% for p in venue_photos %}
+        <div class="photo-item photo-item-public">
+            <img src="{{ url_for('static', filename=p.filename) }}" alt="{{ p.caption or event.venue_name }}">
+            {% if p.caption %}<p class="photo-caption">{{ p.caption }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
+<!-- ── Booking Form ── -->
+<form method="POST" class="form-card" id="booking-form">
+    <p class="section-title">Your Details</p>
     <input type="hidden" name="selected_seats" id="selected_seats" value="">
 
     <div class="field">
@@ -36,17 +88,19 @@
                value="{{ current_user.name if current_user else '' }}"
                placeholder="e.g. John Doe" required>
     </div>
-    <div class="field">
-        <label for="customer_phone">Phone *</label>
-        <input type="tel" id="customer_phone" name="customer_phone"
-               value="{{ current_user.phone if current_user else '' }}"
-               placeholder="+255 7XX XXX XXX" required>
-    </div>
-    <div class="field">
-        <label for="customer_email">Email (optional)</label>
-        <input type="email" id="customer_email" name="customer_email"
-               value="{{ current_user.email if current_user else '' }}"
-               placeholder="john@email.com">
+    <div class="form-row">
+        <div class="field">
+            <label for="customer_phone">Phone *</label>
+            <input type="tel" id="customer_phone" name="customer_phone"
+                   value="{{ current_user.phone if current_user else '' }}"
+                   placeholder="+255 7XX XXX XXX" required>
+        </div>
+        <div class="field">
+            <label for="customer_email">Email (optional)</label>
+            <input type="email" id="customer_email" name="customer_email"
+                   value="{{ current_user.email if current_user else '' }}"
+                   placeholder="john@email.com">
+        </div>
     </div>
 
     <button type="submit" id="book-submit-btn" class="btn btn-primary btn-full" disabled>
@@ -57,23 +111,18 @@
 
 {% block scripts %}
 <script>
-    const bookedSeats = {{ booked_seats|tojson }};
-    const ticketPrice = {{ event.price }};
-
-    buildSeatMap("seat-map", {
-        rows: {{ event.rows }},
-        seatsPerRow: {{ event.seats_per_row }},
-        bookedSeats: bookedSeats,
-        selectable: true,
-        price: ticketPrice,
-    });
-
-    document.getElementById("booking-form").addEventListener("submit", function(e) {
-        const seats = document.getElementById("selected_seats").value;
-        if (!seats) {
-            e.preventDefault();
-            alert("Please select at least one seat.");
-        }
-    });
+buildSeatMap("seat-map", {
+    rows: {{ event.rows }},
+    seatsPerRow: {{ event.seats_per_row }},
+    bookedSeats: {{ booked_seats|tojson }},
+    selectable: true,
+    price: {{ event.price }},
+});
+document.getElementById("booking-form").addEventListener("submit", function(e) {
+    if (!document.getElementById("selected_seats").value) {
+        e.preventDefault();
+        alert("Please select at least one seat.");
+    }
+});
 </script>
 {% endblock %}
