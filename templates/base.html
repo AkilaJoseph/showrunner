@@ -92,7 +92,11 @@
             Browse Events
         </a>
         {% if current_user %}
-            <span class="role-pill role-pill-user" style="margin-left:6px">{{ current_user.name }}</span>
+            <a href="{{ url_for('my_tickets') }}"
+               class="pub-nav-item {% if request.endpoint == 'my_tickets' %}active{% endif %}">
+                🎟 My Tickets
+            </a>
+            <span class="role-pill role-pill-user" style="margin-left:4px">{{ current_user.name }}</span>
             <a href="{{ url_for('user_logout') }}" class="pub-nav-item" style="color:var(--text-muted)">Logout</a>
         {% else %}
             <a href="{{ url_for('user_login') }}"

@@ -13,7 +13,7 @@
                 <span class="tag">📅 {{ event.event_date|fmtdate }}</span>
                 <span class="tag">🕐 {{ event.event_time|fmttime }}</span>
                 <span class="tag">📍 {{ event.venue_name or '—' }}</span>
-                <span class="tag tag-gold">💰 {{ "{:,.0f}".format(event.price) }} TZS</span>
+                <span class="tag tag-gold">💰 {{ "{:,.0f}".format(event.price) }} TZS base</span>
             </div>
         </div>
         <form method="POST" action="{{ url_for('org_delete_event', event_id=event.id) }}"
@@ -23,10 +23,102 @@
     </div>
 </div>
 
+<!-- ── Seat Tiers ── -->
+<div class="card">
+    <p class="section-title">🎫 Ticket Tiers
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
+            Assign row ranges different prices (VIP, VVIP, Regular…)
+        </span>
+    </p>
+
+    {% if tiers %}
+    <div class="tiers-table">
+        {% for t in tiers %}
+        <div class="tier-row">
+            <span class="tier-swatch" style="background:{{ t.color }}"></span>
+            <span class="tier-row-name">{{ t.name }}</span>
+            <span class="tier-row-rows">Rows {{ t.row_from }}–{{ t.row_to }}</span>
+            <span class="tier-row-price">{{ "{:,.0f}".format(t.price) }} TZS</span>
+            <form method="POST" action="{{ url_for('org_delete_tier', event_id=event.id, tier_id=t.id) }}"
+                  onsubmit="return confirm('Remove this tier?')" style="margin-left:auto">
+                <button class="photo-delete-btn" type="submit" title="Remove tier">✕</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px">
+        No tiers yet. Without tiers all seats cost the base price above.
+    </p>
+    {% endif %}
+
+    <!-- Add tier form -->
+    <details class="upload-details" {% if not tiers %}open{% endif %}>
+        <summary class="upload-details-summary">+ Add Ticket Tier</summary>
+        <form method="POST" action="{{ url_for('org_add_tier', event_id=event.id) }}" style="margin-top:14px">
+            <div class="form-row">
+                <div class="field">
+                    <label>Tier Name *</label>
+                    <input type="text" name="name" list="tier-presets" placeholder="e.g. VIP, VVIP, Regular" required>
+                    <datalist id="tier-presets">
+                        <option value="VVIP">
+                        <option value="VIP">
+                        <option value="Platinum">
+                        <option value="Sofa">
+                        <option value="Regular">
+                        <option value="Standing">
+                    </datalist>
+                </div>
+                <div class="field">
+                    <label>Price (TZS) *</label>
+                    <input type="number" name="price" placeholder="e.g. 50000" min="0" step="500" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field">
+                    <label>From Row *</label>
+                    <select name="row_from" required>
+                        {% for l in row_letters %}
+                        <option value="{{ l }}">Row {{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="field">
+                    <label>To Row *</label>
+                    <select name="row_to" required>
+                        {% for l in row_letters %}
+                        <option value="{{ l }}" {% if loop.last %}selected{% endif %}>Row {{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="field">
+                <label>Tier Colour</label>
+                <div class="color-picker-row">
+                    {% set presets = [('#ff6eb4','VVIP pink'),('#7c6fff','VIP purple'),('#3ecfc6','Platinum teal'),('#f5c842','Sofa gold'),('#8fe0b8','Regular green'),('#ff9f43','Bronze orange')] %}
+                    {% for hex, label in presets %}
+                    <label class="color-preset-label" title="{{ label }}">
+                        <input type="radio" name="color" value="{{ hex }}" style="display:none">
+                        <span class="color-preset-dot" style="background:{{ hex }}"></span>
+                    </label>
+                    {% endfor %}
+                    <input type="color" name="color" value="#f5c842" class="color-custom-input" title="Custom colour">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Tier</button>
+        </form>
+    </details>
+</div>
+
+<!-- ── Seat Map ── -->
+<div class="card">
+    <p class="section-title">Seat Map — {{ booked_seats|length }}/{{ event.capacity }} booked</p>
+    <div class="seat-map-container" id="seat-map"></div>
+</div>
+
 <!-- ── Performers ── -->
 <div class="card">
-    <p class="section-title">Lineup / Performers</p>
-
+    <p class="section-title">🎭 Lineup / Performers</p>
     {% if performers %}
     <div class="performers-grid">
         {% for p in performers %}
@@ -41,17 +133,14 @@
                 {% if p.role %}<p class="performer-role">{{ p.role }}</p>{% endif %}
                 {% if p.bio  %}<p class="performer-bio">{{ p.bio }}</p>{% endif %}
             </div>
-            <form method="POST"
-                  action="{{ url_for('org_delete_performer', event_id=event.id, performer_id=p.id) }}"
+            <form method="POST" action="{{ url_for('org_delete_performer', event_id=event.id, performer_id=p.id) }}"
                   onsubmit="return confirm('Remove {{ p.name }}?')" style="margin-top:8px">
-                <button type="submit" class="btn btn-danger" style="width:100%;justify-content:center;font-size:11px">Remove</button>
+                <button class="btn btn-danger" style="width:100%;justify-content:center;font-size:11px">Remove</button>
             </form>
         </div>
         {% endfor %}
     </div>
     {% endif %}
-
-    <!-- Add Performer -->
     <details class="upload-details" {% if not performers %}open{% endif %}>
         <summary class="upload-details-summary">+ Add Performer</summary>
         <form method="POST" action="{{ url_for('org_add_performer', event_id=event.id) }}"
@@ -68,7 +157,7 @@
             </div>
             <div class="field">
                 <label>Short Bio</label>
-                <textarea name="bio" placeholder="A quick hype line about this performer..." style="min-height:60px"></textarea>
+                <textarea name="bio" placeholder="A quick hype line…" style="min-height:60px"></textarea>
             </div>
             <div class="field">
                 <label>Photo</label>
@@ -79,32 +168,27 @@
     </details>
 </div>
 
-<!-- ── Event Gallery (Branding) ── -->
+<!-- ── Event Gallery ── -->
 <div class="card">
-    <p class="section-title">Event Gallery
-        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
-            Moments from past shows — builds hype for ticket buyers
-        </span>
+    <p class="section-title">📸 Event Gallery
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">Moments from past shows</span>
     </p>
-
     {% if photos %}
     <div class="photo-grid">
         {% for p in photos %}
         <div class="photo-item">
             <img src="{{ url_for('static', filename=p.filename) }}" alt="{{ p.caption or event.title }}">
             {% if p.caption %}<p class="photo-caption">{{ p.caption }}</p>{% endif %}
-            <form method="POST"
-                  action="{{ url_for('org_delete_event_photo', event_id=event.id, photo_id=p.id) }}"
+            <form method="POST" action="{{ url_for('org_delete_event_photo', event_id=event.id, photo_id=p.id) }}"
                   class="photo-delete-form" onsubmit="return confirm('Remove this photo?')">
-                <button type="submit" class="photo-delete-btn">✕</button>
+                <button class="photo-delete-btn">✕</button>
             </form>
         </div>
         {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state" style="margin-bottom:16px">No gallery photos yet — upload shots from a previous show to excite ticket buyers!</div>
+    <div class="empty-state" style="margin-bottom:16px">No gallery photos yet.</div>
     {% endif %}
-
     <form method="POST" action="{{ url_for('org_add_event_photo', event_id=event.id) }}"
           enctype="multipart/form-data" class="upload-zone" id="event-upload-zone">
         <div class="upload-zone-inner" onclick="document.getElementById('event-photo-input').click()">
@@ -120,12 +204,6 @@
         </div>
         <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px">Upload Photo</button>
     </form>
-</div>
-
-<!-- ── Seat Map ── -->
-<div class="card">
-    <p class="section-title">Seat Map — {{ booked_seats|length }}/{{ event.capacity }} booked</p>
-    <div class="seat-map-container" id="seat-map"></div>
 </div>
 
 <!-- ── Bookings ── -->
@@ -156,16 +234,28 @@
 
 {% block scripts %}
 <script>
+const tiers = {{ tiers | tojson }};
 buildSeatMap("seat-map", {
     rows: {{ event.rows }},
     seatsPerRow: {{ event.seats_per_row }},
     bookedSeats: {{ booked_seats|tojson }},
     selectable: false,
+    tiers: tiers,
 });
+
+// Colour preset radio sync with color input
+document.querySelectorAll('.color-preset-label').forEach(label => {
+    label.addEventListener('click', () => {
+        const hex = label.querySelector('input').value;
+        document.querySelector('.color-custom-input').value = hex;
+        document.querySelectorAll('.color-preset-dot').forEach(d => d.style.outline = 'none');
+        label.querySelector('.color-preset-dot').style.outline = '2px solid #fff';
+    });
+});
+
 function previewLabel(input, zoneId) {
-    if (input.files && input.files[0]) {
-        document.querySelector('#' + zoneId + ' .upload-label').textContent = input.files[0].name;
-    }
+    if (input.files && input.files[0])
+        document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
 }
 </script>
 {% endblock %}

@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}My Tickets — ShowRunner{% endblock %}
+{% block content %}
+
+<h2 class="page-title">My Tickets</h2>
+<p class="page-subtitle">All your bookings in one place. Show the QR code at the entrance.</p>
+
+{% if not upcoming and not past %}
+<div class="empty-state">
+    You haven't booked any tickets yet.<br>
+    <a href="{{ url_for('book_list') }}" style="color:var(--accent-gold)">Browse events →</a>
+</div>
+{% endif %}
+
+{% if upcoming %}
+<p class="section-title">Upcoming</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:30px">
+    {% for b in upcoming %}
+    <a href="{{ url_for('view_ticket', booking_id=b.id) }}"
+       class="my-ticket-card card card-clickable animate-in" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+        <div class="my-ticket-header">
+            <div>
+                <p class="my-ticket-event">{{ b.event_title }}</p>
+                <p class="my-ticket-meta">{{ b.event_date|fmtdate }} · {{ b.event_time|fmttime }}</p>
+                <p class="my-ticket-venue">📍 {{ b.venue_name or '—' }}</p>
+            </div>
+            <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}" style="flex-shrink:0">
+                {% if b.verified %}✓ Used{% else %}Valid{% endif %}
+            </span>
+        </div>
+        <div class="my-ticket-footer">
+            <div>
+                <p class="my-ticket-label">SEATS</p>
+                <p class="my-ticket-value" style="color:var(--accent-gold)">{{ b.seats }}</p>
+            </div>
+            <div>
+                <p class="my-ticket-label">TOTAL</p>
+                <p class="my-ticket-value" style="color:var(--accent-teal)">{{ "{:,.0f}".format(b.total_amount) }} TZS</p>
+            </div>
+            <div>
+                <p class="my-ticket-label">CODE</p>
+                <p class="my-ticket-value" style="font-family:var(--font-code);color:var(--accent-purple)">{{ b.code }}</p>
+            </div>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:right">Tap to view ticket →</p>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if past %}
+<p class="section-title">Past Events</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+    {% for b in past %}
+    <a href="{{ url_for('view_ticket', booking_id=b.id) }}"
+       class="my-ticket-card my-ticket-past card card-clickable animate-in" style="animation-delay:{{ loop.index0 * 0.05 }}s">
+        <div class="my-ticket-header">
+            <div>
+                <p class="my-ticket-event">{{ b.event_title }}</p>
+                <p class="my-ticket-meta">{{ b.event_date|fmtdate }} · {{ b.event_time|fmttime }}</p>
+                <p class="my-ticket-venue">📍 {{ b.venue_name or '—' }}</p>
+            </div>
+            <span class="badge badge-verified" style="flex-shrink:0;opacity:0.6">Past</span>
+        </div>
+        <div class="my-ticket-footer">
+            <div>
+                <p class="my-ticket-label">SEATS</p>
+                <p class="my-ticket-value">{{ b.seats }}</p>
+            </div>
+            <div>
+                <p class="my-ticket-label">TOTAL</p>
+                <p class="my-ticket-value">{{ "{:,.0f}".format(b.total_amount) }} TZS</p>
+            </div>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

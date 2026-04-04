@@ -3,39 +3,60 @@
 // ═══════════════════════════════════════════════
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Auto-dismiss toasts
     const toasts = document.querySelectorAll(".toast");
-    toasts.forEach((t) => {
-        setTimeout(() => t.remove(), 3000);
-    });
+    toasts.forEach((t) => setTimeout(() => t.remove(), 3000));
 });
 
 
-// ── Seat Map Builder ──
+// ── Seat Map Builder ──────────────────────────────────────────
+//
+// options:
+//   rows, seatsPerRow, bookedSeats, selectable, price, tiers
+//
+// tiers = [{ name, price, color, row_from, row_to }, ...]
+//   row_from / row_to are single letters ('A', 'B' …)
+// ─────────────────────────────────────────────────────────────
 function buildSeatMap(containerId, options) {
     const {
-        rows = 5,
+        rows        = 5,
         seatsPerRow = 8,
         bookedSeats = [],
-        selectable = false,
-        onSelectionChange = null,
-        price = 0,
+        selectable  = false,
+        price       = 0,
+        tiers       = [],
     } = options;
 
     const container = document.getElementById(containerId);
     if (!container) return;
 
-    const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let selectedSeats = [];
+    const LABELS       = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let selectedSeats  = [];
 
+    // ── tier helpers ──────────────────────────────────────────
+    function tierForRow(rowLabel) {
+        const ri = LABELS.indexOf(rowLabel.toUpperCase());
+        for (const t of tiers) {
+            const fi = LABELS.indexOf(t.row_from.toUpperCase());
+            const ti = LABELS.indexOf(t.row_to.toUpperCase());
+            if (ri >= fi && ri <= ti) return t;
+        }
+        return null;
+    }
+
+    function seatPrice(seatId) {
+        const t = tierForRow(seatId[0]);
+        return t ? t.price : price;
+    }
+
+    // ── render ────────────────────────────────────────────────
     function render() {
         container.innerHTML = "";
 
-        // Stage
-        const stageDiv = document.createElement("div");
-        stageDiv.className = "stage-indicator";
-        stageDiv.innerHTML = '<div class="stage-line"></div>';
-        container.appendChild(stageDiv);
+        // Stage indicator
+        const stageWrap  = document.createElement("div");
+        stageWrap.className = "stage-indicator";
+        stageWrap.innerHTML = '<div class="stage-line"></div>';
+        container.appendChild(stageWrap);
 
         const stageLabel = document.createElement("div");
         stageLabel.className = "stage-label";
@@ -47,23 +68,27 @@ function buildSeatMap(containerId, options) {
         grid.className = "seat-grid";
 
         for (let r = 0; r < rows; r++) {
-            const rowDiv = document.createElement("div");
+            const rowLabel = LABELS[r];
+            const tier     = tierForRow(rowLabel);
+            const rowDiv   = document.createElement("div");
             rowDiv.className = "seat-row";
 
-            const rowLabel = document.createElement("span");
-            rowLabel.className = "seat-row-label";
-            rowLabel.textContent = labels[r];
-            rowDiv.appendChild(rowLabel);
+            // Row label (with tier colour if defined)
+            const label = document.createElement("span");
+            label.className = "seat-row-label";
+            label.textContent = rowLabel;
+            if (tier) label.style.color = tier.color;
+            rowDiv.appendChild(label);
 
             for (let c = 0; c < seatsPerRow; c++) {
-                const seatId = `${labels[r]}${c + 1}`;
-                const btn = document.createElement("button");
-                btn.type = "button";
+                const seatId  = `${rowLabel}${c + 1}`;
+                const btn     = document.createElement("button");
+                btn.type      = "button";
                 btn.className = "seat";
                 btn.textContent = c + 1;
-                btn.title = seatId;
+                btn.title     = seatId + (tier ? ` — ${tier.name}` : "");
 
-                const isBooked = bookedSeats.includes(seatId);
+                const isBooked   = bookedSeats.includes(seatId);
                 const isSelected = selectedSeats.includes(seatId);
 
                 if (isBooked) {
@@ -71,85 +96,123 @@ function buildSeatMap(containerId, options) {
                     btn.disabled = true;
                 } else if (isSelected) {
                     btn.classList.add("seat-selected");
+                    if (tier) {
+                        btn.style.background = tier.color;
+                        btn.style.color      = "#111120";
+                    }
                 } else {
                     btn.classList.add("seat-available");
+                    if (tier) {
+                        btn.style.background = tier.color + "22"; // 13% opacity tint
+                        btn.style.border     = `1px solid ${tier.color}55`;
+                    }
                 }
 
                 if (selectable && !isBooked) {
                     btn.addEventListener("click", () => {
-                        if (selectedSeats.includes(seatId)) {
-                            selectedSeats = selectedSeats.filter((s) => s !== seatId);
-                        } else {
-                            selectedSeats.push(seatId);
-                        }
+                        const idx = selectedSeats.indexOf(seatId);
+                        if (idx === -1) selectedSeats.push(seatId);
+                        else           selectedSeats.splice(idx, 1);
                         render();
                         updateSelection();
                     });
                 } else if (!selectable) {
                     btn.style.cursor = "default";
                 }
-
                 rowDiv.appendChild(btn);
             }
             grid.appendChild(rowDiv);
         }
         container.appendChild(grid);
 
-        // Legend
-        if (selectable) {
+        // Tier legend (replaces generic legend when tiers exist)
+        if (tiers.length > 0) {
+            const legend = document.createElement("div");
+            legend.className = "tier-legend";
+            tiers.forEach(t => {
+                const item = document.createElement("div");
+                item.className = "tier-legend-item";
+                item.innerHTML = `
+                    <span class="tier-legend-dot" style="background:${t.color}"></span>
+                    <span class="tier-legend-name">${t.name}</span>
+                    <span class="tier-legend-price">${Number(t.price).toLocaleString()} TZS</span>
+                `;
+                legend.appendChild(item);
+            });
+            container.appendChild(legend);
+        } else if (selectable) {
             const legend = document.createElement("div");
             legend.className = "seat-legend";
             legend.innerHTML = `
                 <span class="seat-legend-item">
-                    <span class="seat-legend-dot" style="background: #2d2d44;"></span> Available
+                    <span class="seat-legend-dot" style="background:#26264a;"></span> Available
                 </span>
                 <span class="seat-legend-item">
-                    <span class="seat-legend-dot" style="background: #f0c040;"></span> Selected
+                    <span class="seat-legend-dot" style="background:var(--accent-gold);"></span> Selected
                 </span>
                 <span class="seat-legend-item">
-                    <span class="seat-legend-dot" style="background: #3a3a4e;"></span> Booked
+                    <span class="seat-legend-dot" style="background:#2a2a40;"></span> Booked
                 </span>
             `;
             container.appendChild(legend);
         }
     }
 
+    // ── selection update ──────────────────────────────────────
     function updateSelection() {
-        // Update hidden input
         const hiddenInput = document.getElementById("selected_seats");
-        if (hiddenInput) {
-            hiddenInput.value = selectedSeats.join(",");
-        }
+        if (hiddenInput) hiddenInput.value = selectedSeats.join(",");
 
-        // Update info display
         const infoDiv = document.getElementById("selection-info");
         if (infoDiv) {
-            if (selectedSeats.length > 0) {
-                infoDiv.style.display = "block";
-                infoDiv.innerHTML = `
-                    <p class="selection-seats">Selected: <strong>${selectedSeats.join(", ")}</strong></p>
-                    <p class="selection-total">Total: ${(selectedSeats.length * price).toLocaleString()} TZS</p>
-                `;
-            } else {
+            if (selectedSeats.length === 0) {
                 infoDiv.style.display = "none";
+            } else {
+                infoDiv.style.display = "block";
+
+                // Build tier breakdown
+                const breakdown = {};
+                let   total     = 0;
+                selectedSeats.forEach(sId => {
+                    const t   = tierForRow(sId[0]);
+                    const p   = t ? t.price : price;
+                    const key = t ? t.name  : "Standard";
+                    const col = t ? t.color : "var(--accent-gold)";
+                    if (!breakdown[key]) breakdown[key] = { price: p, count: 0, color: col };
+                    breakdown[key].count++;
+                    total += p;
+                });
+
+                let html = `<p class="selection-seats">Selected: <strong>${selectedSeats.join(", ")}</strong></p>`;
+
+                if (Object.keys(breakdown).length > 1 || tiers.length > 0) {
+                    html += `<div class="selection-breakdown">`;
+                    for (const [name, info] of Object.entries(breakdown)) {
+                        html += `<span class="selection-tier-line">
+                            <span class="selection-tier-dot" style="background:${info.color}"></span>
+                            ${info.count} × ${name}
+                            <span style="color:var(--text-muted);margin-left:4px">${(info.count * info.price).toLocaleString()} TZS</span>
+                        </span>`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `<p class="selection-total">Total: ${total.toLocaleString()} TZS</p>`;
+                infoDiv.innerHTML = html;
             }
         }
 
-        // Update submit button
         const submitBtn = document.getElementById("book-submit-btn");
         if (submitBtn) {
-            const total = selectedSeats.length * price;
+            let total = 0;
+            selectedSeats.forEach(sId => { total += seatPrice(sId); });
             if (selectedSeats.length > 0) {
-                submitBtn.disabled = false;
+                submitBtn.disabled    = false;
                 submitBtn.textContent = `Confirm Booking — ${total.toLocaleString()} TZS`;
             } else {
-                submitBtn.disabled = true;
+                submitBtn.disabled    = true;
                 submitBtn.textContent = "Select seats to book";
             }
-        }
-
-        if (onSelectionChange) {
-            onSelectionChange(selectedSeats);
         }
     }
 
@@ -158,9 +221,9 @@ function buildSeatMap(containerId, options) {
 }
 
 
-// ── Verify Input Auto-Format ──
+// ── Verify Input Auto-Format ──────────────────────────────────
 function formatVerifyInput(input) {
-    let val = input.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    let val       = input.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
     let formatted = "";
     for (let i = 0; i < val.length && i < 12; i++) {
         if (i > 0 && i % 4 === 0) formatted += "-";

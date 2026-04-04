@@ -3,7 +3,7 @@
 {% block content %}
 <a href="{{ url_for('book_list') }}" class="btn-back">← Back to Events</a>
 
-<!-- ── Hero ── -->
+<!-- Hero -->
 <div class="card" style="background:linear-gradient(135deg,#13132a,#1a1238,#13132a);border-color:#2a2a50;margin-bottom:22px">
     <h2 style="font-family:var(--font-display);font-size:38px;letter-spacing:1px;color:#fff;line-height:1.1">{{ event.title }}</h2>
     <p style="font-size:13px;color:var(--text-secondary);margin-top:6px">
@@ -12,12 +12,20 @@
     {% if event.organizer_name %}
     <p style="font-size:11px;color:var(--text-muted);margin-top:3px">Presented by {{ event.organizer_name }}</p>
     {% endif %}
-    <p style="font-family:var(--font-display);font-size:28px;color:var(--accent-gold);margin-top:14px;letter-spacing:1px">
-        {{ "{:,.0f}".format(event.price) }} <span style="font-size:14px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
+    {% if tiers %}
+    <p style="font-family:var(--font-display);font-size:22px;color:var(--accent-gold);margin-top:14px;letter-spacing:0.5px">
+        from {{ "{:,.0f}".format(tiers|map(attribute='price')|min) }}
+        <span style="font-size:13px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
     </p>
+    {% else %}
+    <p style="font-family:var(--font-display);font-size:28px;color:var(--accent-gold);margin-top:14px;letter-spacing:1px">
+        {{ "{:,.0f}".format(event.price) }}
+        <span style="font-size:14px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
+    </p>
+    {% endif %}
 </div>
 
-<!-- ── Performers / Lineup ── -->
+<!-- Performers -->
 {% if performers %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🎭 Tonight's Lineup</p>
@@ -40,7 +48,7 @@
 </div>
 {% endif %}
 
-<!-- ── Event Gallery ── -->
+<!-- Event Gallery -->
 {% if event_photos %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">📸 From Previous Shows</p>
@@ -55,14 +63,14 @@
 </div>
 {% endif %}
 
-<!-- ── Seat Map ── -->
+<!-- Seat Map -->
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🪑 Select Your Seats</p>
     <div class="seat-map-container" id="seat-map"></div>
     <div id="selection-info" class="selection-info" style="display:none"></div>
 </div>
 
-<!-- ── Venue Photos ── -->
+<!-- Venue Photos -->
 {% if venue_photos %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🏟️ The Venue — {{ event.venue_name }}</p>
@@ -77,11 +85,10 @@
 </div>
 {% endif %}
 
-<!-- ── Booking Form ── -->
+<!-- Booking Form -->
 <form method="POST" class="form-card" id="booking-form">
     <p class="section-title">Your Details</p>
     <input type="hidden" name="selected_seats" id="selected_seats" value="">
-
     <div class="field">
         <label for="customer_name">Full Name *</label>
         <input type="text" id="customer_name" name="customer_name"
@@ -102,7 +109,6 @@
                    placeholder="john@email.com">
         </div>
     </div>
-
     <button type="submit" id="book-submit-btn" class="btn btn-primary btn-full" disabled>
         Select seats to book
     </button>
@@ -111,12 +117,14 @@
 
 {% block scripts %}
 <script>
+const eventTiers = {{ tiers|tojson }};
 buildSeatMap("seat-map", {
-    rows: {{ event.rows }},
+    rows:        {{ event.rows }},
     seatsPerRow: {{ event.seats_per_row }},
     bookedSeats: {{ booked_seats|tojson }},
-    selectable: true,
-    price: {{ event.price }},
+    selectable:  true,
+    price:       {{ event.price }},
+    tiers:       eventTiers,
 });
 document.getElementById("booking-form").addEventListener("submit", function(e) {
     if (!document.getElementById("selected_seats").value) {

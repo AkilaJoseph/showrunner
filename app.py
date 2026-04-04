@@ -19,7 +19,7 @@ from werkzeug.utils import secure_filename
 # ─── App Setup ───────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "showrunner-dev-secret-change-in-prod")
-DATABASE     = os.path.join(os.path.dirname(__file__), "showrunner.db")
+DATABASE      = os.path.join(os.path.dirname(__file__), "showrunner.db")
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 
@@ -89,6 +89,18 @@ def init_db():
             FOREIGN KEY (venue_id) REFERENCES venues(id)
         );
 
+        CREATE TABLE IF NOT EXISTS seat_tiers (
+            id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            price REAL NOT NULL,
+            color TEXT NOT NULL DEFAULT '#f5c842',
+            row_from TEXT NOT NULL,
+            row_to TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (event_id) REFERENCES events(id)
+        );
+
         CREATE TABLE IF NOT EXISTS performers (
             id TEXT PRIMARY KEY,
             event_id TEXT NOT NULL,
@@ -133,7 +145,6 @@ def init_db():
 
 init_db()
 
-# Ensure upload directories exist
 for sub in ("venues", "events", "performers"):
     os.makedirs(os.path.join(UPLOAD_FOLDER, sub), exist_ok=True)
 
@@ -149,44 +160,49 @@ def require_organizer(f):
     return decorated
 
 
+def require_user(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            flash("Please log in to view your tickets.", "error")
+            return redirect(url_for("user_login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ─── Template Context ─────────────────────────────────────────
 @app.context_processor
 def inject_session_info():
     organizer_id = session.get("organizer_id")
-    user_id = session.get("user_id")
-    organizer = None
-    user = None
+    user_id      = session.get("user_id")
+    organizer    = None
+    user         = None
     if organizer_id:
         conn = get_db()
-        organizer = conn.execute(
-            "SELECT * FROM organizers WHERE id = ?", (organizer_id,)
-        ).fetchone()
+        organizer = conn.execute("SELECT * FROM organizers WHERE id = ?", (organizer_id,)).fetchone()
         conn.close()
     if user_id:
         conn = get_db()
-        user = conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         conn.close()
     return {"current_organizer": organizer, "current_user": user}
 
 
 # ─── Utility ─────────────────────────────────────────────────
+LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 def new_id():
     return uuid.uuid4().hex[:12]
 
 
 def generate_ticket_code():
     chars = string.ascii_uppercase.replace("I", "").replace("O", "") + "23456789"
-    parts = ["".join(random.choices(chars, k=4)) for _ in range(3)]
-    return "-".join(parts)
+    return "-".join("".join(random.choices(chars, k=4)) for _ in range(3))
 
 
 def generate_qr_base64(data_str):
-    qr = qrcode.QRCode(
-        version=1, box_size=8, border=2,
-        error_correction=qrcode.constants.ERROR_CORRECT_M,
-    )
+    qr = qrcode.QRCode(version=1, box_size=8, border=2,
+                       error_correction=qrcode.constants.ERROR_CORRECT_M)
     qr.add_data(data_str)
     qr.make(fit=True)
     img = qr.make_image(fill_color="#1a1a2e", back_color="#ffffff")
@@ -197,9 +213,7 @@ def generate_qr_base64(data_str):
 
 def get_booked_seats(event_id):
     conn = get_db()
-    rows = conn.execute(
-        "SELECT seats FROM bookings WHERE event_id = ?", (event_id,)
-    ).fetchall()
+    rows = conn.execute("SELECT seats FROM bookings WHERE event_id = ?", (event_id,)).fetchall()
     conn.close()
     all_seats = []
     for r in rows:
@@ -207,17 +221,51 @@ def get_booked_seats(event_id):
     return [s.strip() for s in all_seats if s.strip()]
 
 
+def calc_seat_total(seats, tiers, base_price):
+    """Return (total, breakdown_list). breakdown = [{name, price, count, color}]"""
+    if not tiers:
+        return base_price * len(seats), []
+
+    breakdown = {}
+    total = 0
+    for seat in seats:
+        row_label = seat[0].upper()
+        row_idx   = LABELS.index(row_label) if row_label in LABELS else 0
+        tier_match = None
+        for t in tiers:
+            fi = LABELS.index(t["row_from"]) if t["row_from"] in LABELS else 0
+            ti = LABELS.index(t["row_to"])   if t["row_to"]   in LABELS else 0
+            if fi <= row_idx <= ti:
+                tier_match = t
+                break
+        if tier_match:
+            price = tier_match["price"]
+            key   = tier_match["id"]
+            if key not in breakdown:
+                breakdown[key] = {"name": tier_match["name"], "price": price,
+                                  "color": tier_match["color"], "count": 0}
+            breakdown[key]["count"] += 1
+        else:
+            price = base_price
+            if "_base" not in breakdown:
+                breakdown["_base"] = {"name": "Standard", "price": base_price,
+                                      "color": "#8888aa", "count": 0}
+            breakdown["_base"]["count"] += 1
+        total += price
+
+    return total, list(breakdown.values())
+
+
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def save_upload(file, subfolder):
-    """Save an uploaded file; return the static-relative path or None on failure."""
     if not file or not file.filename or not allowed_file(file.filename):
         return None
-    ext = file.filename.rsplit(".", 1)[1].lower()
+    ext      = file.filename.rsplit(".", 1)[1].lower()
     filename = f"{uuid.uuid4().hex[:16]}.{ext}"
-    folder = os.path.join(UPLOAD_FOLDER, subfolder)
+    folder   = os.path.join(UPLOAD_FOLDER, subfolder)
     os.makedirs(folder, exist_ok=True)
     file.save(os.path.join(folder, filename))
     return f"uploads/{subfolder}/{filename}"
@@ -265,16 +313,14 @@ def org_register():
             flash("Password must be at least 6 characters.", "error")
             return render_template("org_register.html")
         conn = get_db()
-        if conn.execute("SELECT id FROM organizers WHERE email = ?", (email,)).fetchone():
+        if conn.execute("SELECT id FROM organizers WHERE email=?", (email,)).fetchone():
             conn.close()
             flash("An account with this email already exists.", "error")
             return render_template("org_register.html")
         conn.execute(
-            "INSERT INTO organizers (id, name, email, password_hash, org_name, created_at) VALUES (?,?,?,?,?,?)",
-            (new_id(), name, email, generate_password_hash(password), org_name, datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
+            "INSERT INTO organizers (id,name,email,password_hash,org_name,created_at) VALUES(?,?,?,?,?,?)",
+            (new_id(), name, email, generate_password_hash(password), org_name, datetime.now().isoformat()))
+        conn.commit(); conn.close()
         flash("Account created! Please log in.", "success")
         return redirect(url_for("org_login"))
     return render_template("org_register.html")
@@ -288,7 +334,7 @@ def org_login():
         email    = request.form["email"].strip().lower()
         password = request.form["password"]
         conn = get_db()
-        org = conn.execute("SELECT * FROM organizers WHERE email = ?", (email,)).fetchone()
+        org  = conn.execute("SELECT * FROM organizers WHERE email=?", (email,)).fetchone()
         conn.close()
         if org and check_password_hash(org["password_hash"], password):
             session.clear()
@@ -315,16 +361,16 @@ def org_logout():
 def org_dashboard():
     org_id = session["organizer_id"]
     conn   = get_db()
-    total_events  = conn.execute("SELECT COUNT(*) FROM events WHERE organizer_id = ?", (org_id,)).fetchone()[0]
-    upcoming      = conn.execute("SELECT COUNT(*) FROM events WHERE organizer_id = ? AND event_date >= ?", (org_id, date.today().isoformat())).fetchone()[0]
-    total_bookings = conn.execute("SELECT COUNT(*) FROM bookings b JOIN events e ON b.event_id = e.id WHERE e.organizer_id = ?", (org_id,)).fetchone()[0]
-    verified      = conn.execute("SELECT COUNT(*) FROM bookings b JOIN events e ON b.event_id = e.id WHERE e.organizer_id = ? AND b.verified = 1", (org_id,)).fetchone()[0]
-    revenue_rows  = conn.execute("SELECT b.total_amount FROM bookings b JOIN events e ON b.event_id = e.id WHERE e.organizer_id = ?", (org_id,)).fetchall()
-    total_revenue = sum(r["total_amount"] for r in revenue_rows)
+    total_events   = conn.execute("SELECT COUNT(*) FROM events WHERE organizer_id=?", (org_id,)).fetchone()[0]
+    upcoming       = conn.execute("SELECT COUNT(*) FROM events WHERE organizer_id=? AND event_date>=?", (org_id, date.today().isoformat())).fetchone()[0]
+    total_bookings = conn.execute("SELECT COUNT(*) FROM bookings b JOIN events e ON b.event_id=e.id WHERE e.organizer_id=?", (org_id,)).fetchone()[0]
+    verified       = conn.execute("SELECT COUNT(*) FROM bookings b JOIN events e ON b.event_id=e.id WHERE e.organizer_id=? AND b.verified=1", (org_id,)).fetchone()[0]
+    revenue_rows   = conn.execute("SELECT b.total_amount FROM bookings b JOIN events e ON b.event_id=e.id WHERE e.organizer_id=?", (org_id,)).fetchall()
+    total_revenue  = sum(r["total_amount"] for r in revenue_rows)
     recent_bookings = conn.execute("""
-        SELECT b.*, e.title as event_title
-        FROM bookings b JOIN events e ON b.event_id = e.id
-        WHERE e.organizer_id = ? ORDER BY b.booked_at DESC LIMIT 8
+        SELECT b.*, e.title as event_title FROM bookings b
+        JOIN events e ON b.event_id=e.id WHERE e.organizer_id=?
+        ORDER BY b.booked_at DESC LIMIT 8
     """, (org_id,)).fetchall()
     conn.close()
     return render_template("dashboard.html", stats={
@@ -344,15 +390,12 @@ def org_events_list():
     org_id = session["organizer_id"]
     conn   = get_db()
     events = conn.execute("""
-        SELECT e.*, v.name as venue_name, v.capacity
-        FROM events e LEFT JOIN venues v ON e.venue_id = v.id
-        WHERE e.organizer_id = ? ORDER BY e.event_date DESC
+        SELECT e.*, v.name as venue_name, v.capacity FROM events e
+        LEFT JOIN venues v ON e.venue_id=v.id
+        WHERE e.organizer_id=? ORDER BY e.event_date DESC
     """, (org_id,)).fetchall()
     conn.close()
-    events_data = []
-    for ev in events:
-        booked = len(get_booked_seats(ev["id"]))
-        events_data.append({**dict(ev), "booked": booked})
+    events_data = [{**dict(ev), "booked": len(get_booked_seats(ev["id"]))} for ev in events]
     return render_template("events.html", events=events_data)
 
 
@@ -361,20 +404,17 @@ def org_events_list():
 def org_create_event():
     org_id = session["organizer_id"]
     conn   = get_db()
-    venues = conn.execute("SELECT * FROM venues WHERE organizer_id = ? ORDER BY name", (org_id,)).fetchall()
+    venues = conn.execute("SELECT * FROM venues WHERE organizer_id=? ORDER BY name", (org_id,)).fetchall()
     if request.method == "POST":
         eid = new_id()
         conn.execute(
-            """INSERT INTO events (id, organizer_id, title, description, event_date,
-               event_time, venue_id, price, created_at) VALUES (?,?,?,?,?,?,?,?,?)""",
-            (eid, org_id, request.form["title"], request.form.get("description", ""),
+            "INSERT INTO events (id,organizer_id,title,description,event_date,event_time,venue_id,price,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (eid, org_id, request.form["title"], request.form.get("description",""),
              request.form["event_date"], request.form["event_time"],
              request.form["venue_id"], float(request.form["price"]),
-             datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
-        flash("Event created! Now add performers and photos.", "success")
+             datetime.now().isoformat()))
+        conn.commit(); conn.close()
+        flash("Event created! Add performers, photos and ticket tiers.", "success")
         return redirect(url_for("org_event_detail", event_id=eid))
     conn.close()
     return render_template("create_event.html", venues=venues)
@@ -388,20 +428,22 @@ def org_event_detail(event_id):
     event  = conn.execute("""
         SELECT e.*, v.name as venue_name, v.location as venue_location,
                v.rows, v.seats_per_row, v.capacity
-        FROM events e LEFT JOIN venues v ON e.venue_id = v.id
-        WHERE e.id = ? AND e.organizer_id = ?
+        FROM events e LEFT JOIN venues v ON e.venue_id=v.id
+        WHERE e.id=? AND e.organizer_id=?
     """, (event_id, org_id)).fetchone()
     if not event:
-        conn.close()
-        flash("Event not found.", "error")
+        conn.close(); flash("Event not found.", "error")
         return redirect(url_for("org_events_list"))
-    bookings   = conn.execute("SELECT * FROM bookings WHERE event_id = ? ORDER BY booked_at DESC", (event_id,)).fetchall()
-    performers = conn.execute("SELECT * FROM performers WHERE event_id = ? ORDER BY created_at", (event_id,)).fetchall()
-    photos     = conn.execute("SELECT * FROM event_photos WHERE event_id = ? ORDER BY created_at DESC", (event_id,)).fetchall()
+    bookings   = conn.execute("SELECT * FROM bookings WHERE event_id=? ORDER BY booked_at DESC", (event_id,)).fetchall()
+    performers = conn.execute("SELECT * FROM performers WHERE event_id=? ORDER BY created_at", (event_id,)).fetchall()
+    photos     = conn.execute("SELECT * FROM event_photos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
+    tiers      = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
     conn.close()
     booked_seats = get_booked_seats(event_id)
+    row_letters  = list(LABELS[:event["rows"]]) if event["rows"] else []
     return render_template("event_detail.html", event=event, bookings=bookings,
-                           booked_seats=booked_seats, performers=performers, photos=photos)
+                           booked_seats=booked_seats, performers=performers,
+                           photos=photos, tiers=tiers, row_letters=row_letters)
 
 
 @app.route("/org/events/<event_id>/delete", methods=["POST"])
@@ -409,21 +451,58 @@ def org_event_detail(event_id):
 def org_delete_event(event_id):
     org_id = session["organizer_id"]
     conn   = get_db()
-    event  = conn.execute("SELECT id FROM events WHERE id = ? AND organizer_id = ?", (event_id, org_id)).fetchone()
-    if event:
-        # clean up photos and performer photos
-        for row in conn.execute("SELECT filename FROM event_photos WHERE event_id = ?", (event_id,)).fetchall():
-            delete_upload(row["filename"])
-        for row in conn.execute("SELECT photo FROM performers WHERE event_id = ? AND photo IS NOT NULL", (event_id,)).fetchall():
-            delete_upload(row["photo"])
-        conn.execute("DELETE FROM bookings   WHERE event_id = ?",  (event_id,))
-        conn.execute("DELETE FROM performers WHERE event_id = ?",  (event_id,))
-        conn.execute("DELETE FROM event_photos WHERE event_id = ?", (event_id,))
-        conn.execute("DELETE FROM events     WHERE id = ?",        (event_id,))
-        conn.commit()
-        flash("Event deleted.", "success")
+    if conn.execute("SELECT id FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone():
+        for r in conn.execute("SELECT filename FROM event_photos WHERE event_id=?", (event_id,)).fetchall():
+            delete_upload(r["filename"])
+        for r in conn.execute("SELECT photo FROM performers WHERE event_id=? AND photo IS NOT NULL", (event_id,)).fetchall():
+            delete_upload(r["photo"])
+        conn.execute("DELETE FROM bookings    WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM performers  WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM event_photos WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM seat_tiers  WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM events      WHERE id=?",        (event_id,))
+        conn.commit(); flash("Event deleted.", "success")
     conn.close()
     return redirect(url_for("org_events_list"))
+
+
+# ─── Seat Tiers ──────────────────────────────────────────────
+
+@app.route("/org/events/<event_id>/tiers/add", methods=["POST"])
+@require_organizer
+def org_add_tier(event_id):
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    event  = conn.execute("SELECT id,price FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone()
+    if not event:
+        conn.close(); flash("Event not found.", "error")
+        return redirect(url_for("org_events_list"))
+    name     = request.form["name"].strip()
+    price    = float(request.form["price"])
+    color    = request.form.get("color", "#f5c842").strip()
+    row_from = request.form["row_from"].upper()
+    row_to   = request.form["row_to"].upper()
+    if LABELS.index(row_from) > LABELS.index(row_to):
+        row_from, row_to = row_to, row_from
+    conn.execute(
+        "INSERT INTO seat_tiers (id,event_id,name,price,color,row_from,row_to,created_at) VALUES(?,?,?,?,?,?,?,?)",
+        (new_id(), event_id, name, price, color, row_from, row_to, datetime.now().isoformat()))
+    conn.commit(); conn.close()
+    flash(f"Tier '{name}' added!", "success")
+    return redirect(url_for("org_event_detail", event_id=event_id))
+
+
+@app.route("/org/events/<event_id>/tiers/<tier_id>/delete", methods=["POST"])
+@require_organizer
+def org_delete_tier(event_id, tier_id):
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    conn.execute("""
+        DELETE FROM seat_tiers WHERE id=?
+        AND event_id IN (SELECT id FROM events WHERE id=? AND organizer_id=?)
+    """, (tier_id, event_id, org_id))
+    conn.commit(); conn.close()
+    return redirect(url_for("org_event_detail", event_id=event_id))
 
 
 # ─── Performers ───────────────────────────────────────────────
@@ -433,20 +512,16 @@ def org_delete_event(event_id):
 def org_add_performer(event_id):
     org_id = session["organizer_id"]
     conn   = get_db()
-    event  = conn.execute("SELECT id FROM events WHERE id = ? AND organizer_id = ?", (event_id, org_id)).fetchone()
-    if not event:
-        conn.close()
-        flash("Event not found.", "error")
+    if not conn.execute("SELECT id FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone():
+        conn.close(); flash("Event not found.", "error")
         return redirect(url_for("org_events_list"))
     photo = save_upload(request.files.get("photo"), "performers")
     conn.execute(
-        "INSERT INTO performers (id, event_id, name, role, bio, photo, created_at) VALUES (?,?,?,?,?,?,?)",
+        "INSERT INTO performers (id,event_id,name,role,bio,photo,created_at) VALUES(?,?,?,?,?,?,?)",
         (new_id(), event_id, request.form["name"].strip(),
-         request.form.get("role", "").strip(), request.form.get("bio", "").strip(),
-         photo, datetime.now().isoformat()),
-    )
-    conn.commit()
-    conn.close()
+         request.form.get("role","").strip(), request.form.get("bio","").strip(),
+         photo, datetime.now().isoformat()))
+    conn.commit(); conn.close()
     flash("Performer added!", "success")
     return redirect(url_for("org_event_detail", event_id=event_id))
 
@@ -457,12 +532,12 @@ def org_delete_performer(event_id, performer_id):
     org_id = session["organizer_id"]
     conn   = get_db()
     row    = conn.execute("""
-        SELECT p.* FROM performers p JOIN events e ON p.event_id = e.id
-        WHERE p.id = ? AND e.organizer_id = ?
+        SELECT p.* FROM performers p JOIN events e ON p.event_id=e.id
+        WHERE p.id=? AND e.organizer_id=?
     """, (performer_id, org_id)).fetchone()
     if row:
         delete_upload(row["photo"])
-        conn.execute("DELETE FROM performers WHERE id = ?", (performer_id,))
+        conn.execute("DELETE FROM performers WHERE id=?", (performer_id,))
         conn.commit()
     conn.close()
     return redirect(url_for("org_event_detail", event_id=event_id))
@@ -473,24 +548,19 @@ def org_delete_performer(event_id, performer_id):
 @app.route("/org/events/<event_id>/photos/add", methods=["POST"])
 @require_organizer
 def org_add_event_photo(event_id):
-    org_id = session["organizer_id"]
-    conn   = get_db()
-    event  = conn.execute("SELECT id FROM events WHERE id = ? AND organizer_id = ?", (event_id, org_id)).fetchone()
-    if not event:
-        conn.close()
-        flash("Event not found.", "error")
+    org_id   = session["organizer_id"]
+    conn     = get_db()
+    if not conn.execute("SELECT id FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone():
+        conn.close(); flash("Event not found.", "error")
         return redirect(url_for("org_events_list"))
     filename = save_upload(request.files.get("photo"), "events")
     if not filename:
-        flash("Invalid file. Use PNG, JPG, GIF or WEBP.", "error")
-        conn.close()
+        conn.close(); flash("Invalid file. Use PNG, JPG, GIF or WEBP.", "error")
         return redirect(url_for("org_event_detail", event_id=event_id))
     conn.execute(
-        "INSERT INTO event_photos (id, event_id, filename, caption, created_at) VALUES (?,?,?,?,?)",
-        (new_id(), event_id, filename, request.form.get("caption", "").strip(), datetime.now().isoformat()),
-    )
-    conn.commit()
-    conn.close()
+        "INSERT INTO event_photos (id,event_id,filename,caption,created_at) VALUES(?,?,?,?,?)",
+        (new_id(), event_id, filename, request.form.get("caption","").strip(), datetime.now().isoformat()))
+    conn.commit(); conn.close()
     flash("Photo added!", "success")
     return redirect(url_for("org_event_detail", event_id=event_id))
 
@@ -501,12 +571,12 @@ def org_delete_event_photo(event_id, photo_id):
     org_id = session["organizer_id"]
     conn   = get_db()
     row    = conn.execute("""
-        SELECT ep.* FROM event_photos ep JOIN events e ON ep.event_id = e.id
-        WHERE ep.id = ? AND e.organizer_id = ?
+        SELECT ep.* FROM event_photos ep JOIN events e ON ep.event_id=e.id
+        WHERE ep.id=? AND e.organizer_id=?
     """, (photo_id, org_id)).fetchone()
     if row:
         delete_upload(row["filename"])
-        conn.execute("DELETE FROM event_photos WHERE id = ?", (photo_id,))
+        conn.execute("DELETE FROM event_photos WHERE id=?", (photo_id,))
         conn.commit()
     conn.close()
     return redirect(url_for("org_event_detail", event_id=event_id))
@@ -521,7 +591,7 @@ def org_delete_event_photo(event_id, photo_id):
 def org_venues_list():
     org_id = session["organizer_id"]
     conn   = get_db()
-    venues = conn.execute("SELECT * FROM venues WHERE organizer_id = ? ORDER BY name", (org_id,)).fetchall()
+    venues = conn.execute("SELECT * FROM venues WHERE organizer_id=? ORDER BY name", (org_id,)).fetchall()
     conn.close()
     return render_template("venues.html", venues=venues)
 
@@ -531,21 +601,17 @@ def org_venues_list():
 def org_create_venue():
     org_id = session["organizer_id"]
     if request.method == "POST":
-        rows         = int(request.form["rows"])
+        rows          = int(request.form["rows"])
         seats_per_row = int(request.form["seats_per_row"])
         conn = get_db()
+        vid  = new_id()
         conn.execute(
-            "INSERT INTO venues (id, organizer_id, name, location, rows, seats_per_row, capacity, created_at) VALUES (?,?,?,?,?,?,?,?)",
-            (new_id(), org_id, request.form["name"], request.form["location"],
-             rows, seats_per_row, rows * seats_per_row, datetime.now().isoformat()),
-        )
-        conn.commit()
-        vid = conn.execute("SELECT last_insert_rowid()").fetchone()
-        # get the id we just inserted
-        venue = conn.execute("SELECT id FROM venues WHERE organizer_id = ? ORDER BY created_at DESC LIMIT 1", (org_id,)).fetchone()
-        conn.close()
+            "INSERT INTO venues (id,organizer_id,name,location,rows,seats_per_row,capacity,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            (vid, org_id, request.form["name"], request.form["location"],
+             rows, seats_per_row, rows * seats_per_row, datetime.now().isoformat()))
+        conn.commit(); conn.close()
         flash("Venue created! Add some photos to show it off.", "success")
-        return redirect(url_for("org_venue_detail", venue_id=venue["id"]))
+        return redirect(url_for("org_venue_detail", venue_id=vid))
     return render_template("create_venue.html")
 
 
@@ -554,12 +620,11 @@ def org_create_venue():
 def org_venue_detail(venue_id):
     org_id = session["organizer_id"]
     conn   = get_db()
-    venue  = conn.execute("SELECT * FROM venues WHERE id = ? AND organizer_id = ?", (venue_id, org_id)).fetchone()
+    venue  = conn.execute("SELECT * FROM venues WHERE id=? AND organizer_id=?", (venue_id, org_id)).fetchone()
     if not venue:
-        conn.close()
-        flash("Venue not found.", "error")
+        conn.close(); flash("Venue not found.", "error")
         return redirect(url_for("org_venues_list"))
-    photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id = ? ORDER BY created_at DESC", (venue_id,)).fetchall()
+    photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC", (venue_id,)).fetchall()
     conn.close()
     return render_template("venue_detail.html", venue=venue, photos=photos)
 
@@ -567,24 +632,19 @@ def org_venue_detail(venue_id):
 @app.route("/org/venues/<venue_id>/photos/add", methods=["POST"])
 @require_organizer
 def org_add_venue_photo(venue_id):
-    org_id = session["organizer_id"]
-    conn   = get_db()
-    venue  = conn.execute("SELECT id FROM venues WHERE id = ? AND organizer_id = ?", (venue_id, org_id)).fetchone()
-    if not venue:
-        conn.close()
-        flash("Venue not found.", "error")
+    org_id   = session["organizer_id"]
+    conn     = get_db()
+    if not conn.execute("SELECT id FROM venues WHERE id=? AND organizer_id=?", (venue_id, org_id)).fetchone():
+        conn.close(); flash("Venue not found.", "error")
         return redirect(url_for("org_venues_list"))
     filename = save_upload(request.files.get("photo"), "venues")
     if not filename:
-        flash("Invalid file. Use PNG, JPG, GIF or WEBP.", "error")
-        conn.close()
+        conn.close(); flash("Invalid file. Use PNG, JPG, GIF or WEBP.", "error")
         return redirect(url_for("org_venue_detail", venue_id=venue_id))
     conn.execute(
-        "INSERT INTO venue_photos (id, venue_id, filename, caption, created_at) VALUES (?,?,?,?,?)",
-        (new_id(), venue_id, filename, request.form.get("caption", "").strip(), datetime.now().isoformat()),
-    )
-    conn.commit()
-    conn.close()
+        "INSERT INTO venue_photos (id,venue_id,filename,caption,created_at) VALUES(?,?,?,?,?)",
+        (new_id(), venue_id, filename, request.form.get("caption","").strip(), datetime.now().isoformat()))
+    conn.commit(); conn.close()
     flash("Photo added!", "success")
     return redirect(url_for("org_venue_detail", venue_id=venue_id))
 
@@ -595,12 +655,12 @@ def org_delete_venue_photo(venue_id, photo_id):
     org_id = session["organizer_id"]
     conn   = get_db()
     row    = conn.execute("""
-        SELECT vp.* FROM venue_photos vp JOIN venues v ON vp.venue_id = v.id
-        WHERE vp.id = ? AND v.organizer_id = ?
+        SELECT vp.* FROM venue_photos vp JOIN venues v ON vp.venue_id=v.id
+        WHERE vp.id=? AND v.organizer_id=?
     """, (photo_id, org_id)).fetchone()
     if row:
         delete_upload(row["filename"])
-        conn.execute("DELETE FROM venue_photos WHERE id = ?", (photo_id,))
+        conn.execute("DELETE FROM venue_photos WHERE id=?", (photo_id,))
         conn.commit()
     conn.close()
     return redirect(url_for("org_venue_detail", venue_id=venue_id))
@@ -611,18 +671,17 @@ def org_delete_venue_photo(venue_id, photo_id):
 def org_delete_venue(venue_id):
     org_id = session["organizer_id"]
     conn   = get_db()
-    for row in conn.execute("SELECT filename FROM venue_photos WHERE venue_id = ?", (venue_id,)).fetchall():
-        delete_upload(row["filename"])
-    conn.execute("DELETE FROM venue_photos WHERE venue_id = ?", (venue_id,))
-    conn.execute("DELETE FROM venues WHERE id = ? AND organizer_id = ?", (venue_id, org_id))
-    conn.commit()
-    conn.close()
+    for r in conn.execute("SELECT filename FROM venue_photos WHERE venue_id=?", (venue_id,)).fetchall():
+        delete_upload(r["filename"])
+    conn.execute("DELETE FROM venue_photos WHERE venue_id=?", (venue_id,))
+    conn.execute("DELETE FROM venues WHERE id=? AND organizer_id=?", (venue_id, org_id))
+    conn.commit(); conn.close()
     flash("Venue deleted.", "success")
     return redirect(url_for("org_venues_list"))
 
 
 # ═══════════════════════════════════════════════════════════════
-# ORGANIZER — BOOKINGS
+# ORGANIZER — BOOKINGS & VERIFY
 # ═══════════════════════════════════════════════════════════════
 
 @app.route("/org/bookings")
@@ -631,39 +690,32 @@ def org_bookings_list():
     org_id = session["organizer_id"]
     conn   = get_db()
     bookings = conn.execute("""
-        SELECT b.*, e.title as event_title, e.event_date, e.event_time
-        FROM bookings b JOIN events e ON b.event_id = e.id
-        WHERE e.organizer_id = ? ORDER BY b.booked_at DESC
+        SELECT b.*, e.title as event_title, e.event_date, e.event_time FROM bookings b
+        JOIN events e ON b.event_id=e.id WHERE e.organizer_id=? ORDER BY b.booked_at DESC
     """, (org_id,)).fetchall()
     conn.close()
     return render_template("bookings.html", bookings=bookings)
 
 
-# ═══════════════════════════════════════════════════════════════
-# ORGANIZER — VERIFY
-# ═══════════════════════════════════════════════════════════════
-
 @app.route("/org/verify", methods=["GET", "POST"])
 @require_organizer
 def org_verify_ticket():
-    org_id     = session["organizer_id"]
-    result     = None
-    code_input = ""
+    org_id = session["organizer_id"]
+    result = None; code_input = ""
     if request.method == "POST":
-        code_input = request.form.get("code", "").strip().upper().replace(" ", "")
-        clean      = code_input.replace("-", "")
+        code_input = request.form.get("code","").strip().upper().replace(" ","")
+        clean      = code_input.replace("-","")
         conn       = get_db()
         booking    = conn.execute("""
             SELECT b.*, e.title as event_title, e.event_date, e.event_time, v.name as venue_name
-            FROM bookings b
-            JOIN events e ON b.event_id = e.id
-            LEFT JOIN venues v ON e.venue_id = v.id
-            WHERE REPLACE(b.code, '-', '') = ? AND e.organizer_id = ?
+            FROM bookings b JOIN events e ON b.event_id=e.id
+            LEFT JOIN venues v ON e.venue_id=v.id
+            WHERE REPLACE(b.code,'-','')=? AND e.organizer_id=?
         """, (clean, org_id)).fetchone()
         if booking:
             already = booking["verified"] == 1
             if not already:
-                conn.execute("UPDATE bookings SET verified = 1, verified_at = ? WHERE id = ?",
+                conn.execute("UPDATE bookings SET verified=1, verified_at=? WHERE id=?",
                              (datetime.now().isoformat(), booking["id"]))
                 conn.commit()
             result = {"status": "already" if already else "success", "booking": dict(booking)}
@@ -684,22 +736,19 @@ def user_register():
     if request.method == "POST":
         name     = request.form["name"].strip()
         email    = request.form["email"].strip().lower()
-        phone    = request.form.get("phone", "").strip()
+        phone    = request.form.get("phone","").strip()
         password = request.form["password"]
         if len(password) < 6:
             flash("Password must be at least 6 characters.", "error")
             return render_template("user_register.html")
         conn = get_db()
-        if conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
-            conn.close()
-            flash("An account with this email already exists.", "error")
+        if conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
+            conn.close(); flash("An account with this email already exists.", "error")
             return render_template("user_register.html")
         conn.execute(
-            "INSERT INTO users (id, name, email, password_hash, phone, created_at) VALUES (?,?,?,?,?,?)",
-            (new_id(), name, email, generate_password_hash(password), phone, datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
+            "INSERT INTO users (id,name,email,password_hash,phone,created_at) VALUES(?,?,?,?,?,?)",
+            (new_id(), name, email, generate_password_hash(password), phone, datetime.now().isoformat()))
+        conn.commit(); conn.close()
         flash("Account created! Please log in.", "success")
         return redirect(url_for("user_login"))
     return render_template("user_register.html")
@@ -713,12 +762,12 @@ def user_login():
         email    = request.form["email"].strip().lower()
         password = request.form["password"]
         conn     = get_db()
-        user     = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user     = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         conn.close()
         if user and check_password_hash(user["password_hash"], password):
             session.clear()
             session["user_id"] = user["id"]
-            session["role"]    = "user"
+            session["role"] = "user"
             return redirect(url_for("book_list"))
         flash("Invalid email or password.", "error")
     return render_template("user_login.html")
@@ -728,6 +777,33 @@ def user_login():
 def user_logout():
     session.clear()
     return redirect(url_for("book_list"))
+
+
+# ═══════════════════════════════════════════════════════════════
+# USER — MY TICKETS
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/my-tickets")
+@require_user
+def my_tickets():
+    user_id = session["user_id"]
+    conn    = get_db()
+    bookings = conn.execute("""
+        SELECT b.*, e.title as event_title, e.event_date, e.event_time,
+               v.name as venue_name, v.location as venue_location,
+               o.org_name as organizer_name
+        FROM bookings b
+        JOIN events e ON b.event_id=e.id
+        LEFT JOIN venues v ON e.venue_id=v.id
+        LEFT JOIN organizers o ON e.organizer_id=o.id
+        WHERE b.user_id=?
+        ORDER BY e.event_date DESC
+    """, (user_id,)).fetchall()
+    conn.close()
+    today = date.today().isoformat()
+    upcoming = [b for b in bookings if b["event_date"] >= today]
+    past     = [b for b in bookings if b["event_date"] <  today]
+    return render_template("my_tickets.html", upcoming=upcoming, past=past)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -747,22 +823,29 @@ def book_list():
     events = conn.execute("""
         SELECT e.*, v.name as venue_name, v.capacity, o.org_name as organizer_name
         FROM events e
-        LEFT JOIN venues v ON e.venue_id = v.id
-        LEFT JOIN organizers o ON e.organizer_id = o.id
-        WHERE e.event_date >= ? AND e.status = 'active'
+        LEFT JOIN venues v ON e.venue_id=v.id
+        LEFT JOIN organizers o ON e.organizer_id=o.id
+        WHERE e.event_date>=? AND e.status='active'
         ORDER BY e.event_date ASC
     """, (date.today().isoformat(),)).fetchall()
 
     events_data = []
     for ev in events:
         booked = len(get_booked_seats(ev["id"]))
-        # grab first event photo for cover
-        cover = conn.execute(
-            "SELECT filename FROM event_photos WHERE event_id = ? ORDER BY created_at LIMIT 1",
-            (ev["id"],)
-        ).fetchone()
-        events_data.append({**dict(ev), "booked": booked,
-                             "cover": cover["filename"] if cover else None})
+        cover  = conn.execute(
+            "SELECT filename FROM event_photos WHERE event_id=? ORDER BY created_at LIMIT 1",
+            (ev["id"],)).fetchone()
+        # min tier price for display
+        min_tier = conn.execute(
+            "SELECT MIN(price) as mp FROM seat_tiers WHERE event_id=?", (ev["id"],)).fetchone()
+        has_tiers   = min_tier and min_tier["mp"] is not None
+        display_price = min_tier["mp"] if has_tiers else ev["price"]
+        events_data.append({
+            **dict(ev), "booked": booked,
+            "cover": cover["filename"] if cover else None,
+            "display_price": display_price,
+            "has_tiers": has_tiers,
+        })
     conn.close()
     return render_template("book.html", events=events_data)
 
@@ -775,82 +858,82 @@ def book_event(event_id):
                v.rows, v.seats_per_row, v.capacity, v.id as venue_db_id,
                o.org_name as organizer_name
         FROM events e
-        LEFT JOIN venues v ON e.venue_id = v.id
-        LEFT JOIN organizers o ON e.organizer_id = o.id
-        WHERE e.id = ? AND e.status = 'active'
+        LEFT JOIN venues v ON e.venue_id=v.id
+        LEFT JOIN organizers o ON e.organizer_id=o.id
+        WHERE e.id=? AND e.status='active'
     """, (event_id,)).fetchone()
 
     if not event:
-        conn.close()
-        flash("Event not found.", "error")
+        conn.close(); flash("Event not found.", "error")
         return redirect(url_for("book_list"))
 
-    booked_seats   = get_booked_seats(event_id)
-    performers     = conn.execute("SELECT * FROM performers WHERE event_id = ? ORDER BY created_at", (event_id,)).fetchall()
-    event_photos   = conn.execute("SELECT * FROM event_photos WHERE event_id = ? ORDER BY created_at DESC", (event_id,)).fetchall()
-    venue_photos   = conn.execute("SELECT * FROM venue_photos WHERE venue_id = ? ORDER BY created_at DESC", (event["venue_db_id"],)).fetchall() if event["venue_db_id"] else []
+    booked_seats = get_booked_seats(event_id)
+    tiers        = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
+    performers   = conn.execute("SELECT * FROM performers WHERE event_id=? ORDER BY created_at", (event_id,)).fetchall()
+    event_photos = conn.execute("SELECT * FROM event_photos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
+    venue_photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC",
+                                (event["venue_db_id"],)).fetchall() if event["venue_db_id"] else []
 
     if request.method == "POST":
-        seats_str = request.form.get("selected_seats", "")
+        seats_str = request.form.get("selected_seats","")
         seats     = [s.strip() for s in seats_str.split(",") if s.strip()]
         if not seats:
             flash("Please select at least one seat.", "error")
-            conn.close()
-            return redirect(url_for("book_event", event_id=event_id))
+            conn.close(); return redirect(url_for("book_event", event_id=event_id))
         for s in seats:
             if s in booked_seats:
                 flash(f"Seat {s} was just taken. Please reselect.", "error")
-                conn.close()
-                return redirect(url_for("book_event", event_id=event_id))
-        code       = generate_ticket_code()
-        total      = event["price"] * len(seats)
+                conn.close(); return redirect(url_for("book_event", event_id=event_id))
+
+        total, _ = calc_seat_total(seats, tiers, event["price"])
         booking_id = new_id()
         user_id    = session.get("user_id")
         conn.execute(
-            """INSERT INTO bookings (id, event_id, user_id, code, customer_name,
-               customer_email, customer_phone, seats, total_amount, booked_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
-            (booking_id, event_id, user_id, code,
-             request.form["customer_name"], request.form.get("customer_email", ""),
+            "INSERT INTO bookings (id,event_id,user_id,code,customer_name,customer_email,customer_phone,seats,total_amount,booked_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (booking_id, event_id, user_id, generate_ticket_code(),
+             request.form["customer_name"], request.form.get("customer_email",""),
              request.form["customer_phone"], ", ".join(seats),
-             total, datetime.now().isoformat()),
-        )
-        conn.commit()
-        conn.close()
+             total, datetime.now().isoformat()))
+        conn.commit(); conn.close()
         flash("Booking confirmed!", "success")
         return redirect(url_for("view_ticket", booking_id=booking_id))
 
     conn.close()
     return render_template("book_event.html", event=event, booked_seats=booked_seats,
-                           performers=performers, event_photos=event_photos,
-                           venue_photos=venue_photos)
+                           tiers=tiers, performers=performers,
+                           event_photos=event_photos, venue_photos=venue_photos)
 
 
 @app.route("/ticket/<booking_id>")
 def view_ticket(booking_id):
     conn    = get_db()
-    booking = conn.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,)).fetchone()
+    booking = conn.execute("SELECT * FROM bookings WHERE id=?", (booking_id,)).fetchone()
     if not booking:
-        conn.close()
-        flash("Booking not found.", "error")
+        conn.close(); flash("Booking not found.", "error")
         return redirect(url_for("book_list"))
     event = conn.execute("""
         SELECT e.*, v.name as venue_name, v.location as venue_location, o.org_name as organizer_name
-        FROM events e
-        LEFT JOIN venues v ON e.venue_id = v.id
-        LEFT JOIN organizers o ON e.organizer_id = o.id
-        WHERE e.id = ?
+        FROM events e LEFT JOIN venues v ON e.venue_id=v.id
+        LEFT JOIN organizers o ON e.organizer_id=o.id WHERE e.id=?
     """, (booking["event_id"],)).fetchone()
     conn.close()
-    qr_data = f"SHOWRUNNER|{booking['code']}|{booking['customer_name']}|{booking['seats']}"
-    qr_b64  = generate_qr_base64(qr_data)
+    qr_b64 = generate_qr_base64(f"SHOWRUNNER|{booking['code']}|{booking['customer_name']}|{booking['seats']}")
     return render_template("ticket.html", booking=booking, event=event, qr_base64=qr_b64)
 
 
 # ─── API ─────────────────────────────────────────────────────
+
 @app.route("/api/booked-seats/<event_id>")
 def api_booked_seats(event_id):
     return jsonify(get_booked_seats(event_id))
+
+
+@app.route("/api/event-tiers/<event_id>")
+def api_event_tiers(event_id):
+    conn  = get_db()
+    tiers = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
+    conn.close()
+    return jsonify(tiers)
 
 
 # ─── Run ─────────────────────────────────────────────────────
