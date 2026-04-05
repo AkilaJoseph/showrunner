@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Brand Profile — ShowRunner{% endblock %}
+{% block content %}
+<h2 class="page-title">🎨 Brand Profile</h2>
+<p style="color:var(--text-secondary);margin-bottom:24px;font-size:14px">
+    Your brand is shown on every event page, ticket, and share card — make it shine.
+</p>
+
+<form method="POST" enctype="multipart/form-data">
+
+    <!-- Logo -->
+    <div class="card" style="margin-bottom:18px">
+        <p class="section-title">Organization Logo</p>
+        {% if org.logo %}
+        <div style="margin-bottom:14px;display:flex;align-items:center;gap:14px">
+            <img src="{{ url_for('static', filename=org.logo) }}" alt="Logo"
+                 style="width:72px;height:72px;object-fit:contain;border-radius:10px;background:var(--bg-secondary);padding:6px;border:1px solid var(--border)">
+            <div>
+                <p style="font-size:13px;color:var(--text-secondary)">Current logo</p>
+                <p style="font-size:11px;color:var(--text-muted)">Upload a new one to replace it</p>
+            </div>
+        </div>
+        {% endif %}
+        <div class="upload-zone" id="logo-zone" style="max-width:400px">
+            <div class="upload-zone-inner" onclick="document.getElementById('logo-input').click()">
+                <div class="upload-icon">🖼️</div>
+                <p class="upload-label">Click to upload logo</p>
+                <p class="upload-hint">PNG or WEBP with transparent background works best</p>
+                <input type="file" id="logo-input" name="logo" accept="image/*"
+                       style="display:none" onchange="previewLabel(this,'logo-zone')">
+            </div>
+        </div>
+    </div>
+
+    <!-- Org details -->
+    <div class="card" style="margin-bottom:18px">
+        <p class="section-title">Organization Details</p>
+        <div class="field">
+            <label>Organization Name *</label>
+            <input type="text" name="org_name" value="{{ org.org_name }}" placeholder="e.g. Paukwa Events" required>
+        </div>
+        <div class="field">
+            <label>Tagline</label>
+            <input type="text" name="tagline" value="{{ org.tagline or '' }}"
+                   placeholder="e.g. Tanzania's #1 Comedy Nights" maxlength="100">
+            <span class="field-hint">Shown under your name on event pages</span>
+        </div>
+        <div class="form-row">
+            <div class="field">
+                <label>WhatsApp / Phone</label>
+                <input type="tel" name="phone" value="{{ org.phone or '' }}" placeholder="+255 7XX XXX XXX">
+                <span class="field-hint">Shown as a contact link on event pages</span>
+            </div>
+            <div class="field">
+                <label>Website / Social Link</label>
+                <input type="url" name="website" value="{{ org.website or '' }}" placeholder="https://instagram.com/yourpage">
+            </div>
+        </div>
+    </div>
+
+    <!-- Brand color -->
+    <div class="card" style="margin-bottom:18px">
+        <p class="section-title">Brand Colour</p>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">
+            Used as accent on your event pages and shared ticket cards.
+        </p>
+        <div class="color-picker-row" style="margin-bottom:14px">
+            {% set presets = [('#f5c842','Gold'),('#7c6fff','Purple'),('#3ecfc6','Teal'),('#ff6eb4','Pink'),('#ff9f43','Orange'),('#8fe0b8','Green')] %}
+            {% for hex, label in presets %}
+            <label class="color-preset-label" title="{{ label }}">
+                <input type="radio" name="brand_color_preset" value="{{ hex }}" style="display:none"
+                       {% if (org.brand_color or '#f5c842') == hex %}checked{% endif %}>
+                <span class="color-preset-dot" style="background:{{ hex }};{% if (org.brand_color or '#f5c842') == hex %}outline:2px solid #fff;outline-offset:2px{% endif %}"></span>
+            </label>
+            {% endfor %}
+            <input type="color" name="brand_color" id="brand-color-input"
+                   value="{{ org.brand_color or '#f5c842' }}"
+                   class="color-custom-input" title="Custom colour">
+        </div>
+
+        <!-- Live preview -->
+        <div id="brand-preview" style="
+            padding:16px 20px;
+            border-radius:12px;
+            background:linear-gradient(135deg,#13132a,#1a1238);
+            border:2px solid {{ org.brand_color or '#f5c842' }};
+            max-width:360px;
+            transition:border-color 0.2s;
+        ">
+            {% if org.logo %}
+            <img src="{{ url_for('static', filename=org.logo) }}" alt=""
+                 style="height:36px;object-fit:contain;margin-bottom:8px">
+            {% endif %}
+            <div style="font-family:var(--font-display);font-size:22px;letter-spacing:1px;color:#fff">
+                {{ org.org_name }}
+            </div>
+            {% if org.tagline %}
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:3px">{{ org.tagline }}</div>
+            {% endif %}
+            <div id="preview-accent" style="
+                margin-top:10px;
+                font-family:var(--font-display);
+                font-size:18px;
+                letter-spacing:0.5px;
+                color:{{ org.brand_color or '#f5c842' }};
+            ">Live Preview</div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="min-width:180px">Save Profile</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Colour preset sync
+document.querySelectorAll('.color-preset-label').forEach(label => {
+    label.addEventListener('click', () => {
+        const hex = label.querySelector('input').value;
+        document.getElementById('brand-color-input').value = hex;
+        updatePreviewColor(hex);
+        document.querySelectorAll('.color-preset-dot').forEach(d => d.style.outline = 'none');
+        label.querySelector('.color-preset-dot').style.outline = '2px solid #fff';
+        label.querySelector('.color-preset-dot').style.outlineOffset = '2px';
+    });
+});
+document.getElementById('brand-color-input').addEventListener('input', function() {
+    updatePreviewColor(this.value);
+});
+function updatePreviewColor(hex) {
+    document.getElementById('brand-preview').style.borderColor = hex;
+    document.getElementById('preview-accent').style.color = hex;
+}
+function previewLabel(input, zoneId) {
+    if (input.files && input.files[0])
+        document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
+}
+</script>
+{% endblock %}

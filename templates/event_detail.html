@@ -79,7 +79,7 @@
                     <label>From Row *</label>
                     <select name="row_from" required>
                         {% for l in row_letters %}
-                        <option value="{{ l }}">Row {{ l }}</option>
+                        <option value="{{ l }}">Row {{ l }}{% if row_names.get(l) %} — {{ row_names[l] }}{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -87,7 +87,7 @@
                     <label>To Row *</label>
                     <select name="row_to" required>
                         {% for l in row_letters %}
-                        <option value="{{ l }}" {% if loop.last %}selected{% endif %}>Row {{ l }}</option>
+                        <option value="{{ l }}" {% if loop.last %}selected{% endif %}>Row {{ l }}{% if row_names.get(l) %} — {{ row_names[l] }}{% endif %}</option>
                         {% endfor %}
                     </select>
                 </div>

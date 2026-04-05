@@ -53,6 +53,11 @@ def init_db():
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
             org_name TEXT NOT NULL,
+            tagline TEXT,
+            logo TEXT,
+            brand_color TEXT DEFAULT '#f5c842',
+            phone TEXT,
+            website TEXT,
             created_at TEXT NOT NULL
         );
 
@@ -74,6 +79,7 @@ def init_db():
             seats_per_row INTEGER NOT NULL,
             capacity INTEGER NOT NULL,
             row_config TEXT,
+            row_names TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (organizer_id) REFERENCES organizers(id)
         );
@@ -97,6 +103,8 @@ def init_db():
             venue_id TEXT NOT NULL,
             price REAL NOT NULL DEFAULT 0,
             status TEXT NOT NULL DEFAULT 'active',
+            cover_photo TEXT,
+            payment_info TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (organizer_id) REFERENCES organizers(id),
             FOREIGN KEY (venue_id) REFERENCES venues(id)
@@ -167,7 +175,23 @@ def init_db():
 
 init_db()
 
-for sub in ("venues", "events", "performers"):
+# ── Live DB migrations ────────────────────────────────────────
+for _col, _sql in [
+    ("row_names",    "ALTER TABLE venues ADD COLUMN row_names TEXT"),
+    ("tagline",      "ALTER TABLE organizers ADD COLUMN tagline TEXT"),
+    ("logo",         "ALTER TABLE organizers ADD COLUMN logo TEXT"),
+    ("brand_color",  "ALTER TABLE organizers ADD COLUMN brand_color TEXT DEFAULT '#f5c842'"),
+    ("phone",        "ALTER TABLE organizers ADD COLUMN phone TEXT"),
+    ("website",      "ALTER TABLE organizers ADD COLUMN website TEXT"),
+    ("cover_photo",  "ALTER TABLE events ADD COLUMN cover_photo TEXT"),
+    ("payment_info", "ALTER TABLE events ADD COLUMN payment_info TEXT"),
+]:
+    try:
+        _c = get_db(); _c.execute(_sql); _c.commit(); _c.close()
+    except Exception:
+        pass  # column already exists
+
+for sub in ("venues", "events", "performers", "logos"):
     os.makedirs(os.path.join(UPLOAD_FOLDER, sub), exist_ok=True)
 
 
@@ -362,7 +386,6 @@ def get_booked_seats(event_id):
 def parse_row_config(venue):
     """Return {row_letter: seat_count} dict for a venue row.
     Falls back to uniform seats_per_row if row_config is NULL."""
-    import json
     if venue["row_config"]:
         try:
             return json.loads(venue["row_config"])
@@ -370,6 +393,16 @@ def parse_row_config(venue):
             pass
     letters = list(LABELS[:venue["rows"]])
     return {l: venue["seats_per_row"] for l in letters}
+
+
+def parse_row_names(venue):
+    """Return {row_letter: display_name} dict. Empty dict if not set."""
+    try:
+        if venue["row_names"]:
+            return json.loads(venue["row_names"])
+    except Exception:
+        pass
+    return {}
 
 
 def row_config_capacity(cfg):
@@ -450,6 +483,14 @@ def format_time(t):
 app.jinja_env.filters["fmtdate"] = format_date
 app.jinja_env.filters["fmttime"] = format_time
 
+import markupsafe
+def nl2br(value):
+    if not value:
+        return ""
+    escaped = markupsafe.escape(value)
+    return markupsafe.Markup(str(escaped).replace("\n", "<br>"))
+app.jinja_env.filters["nl2br"] = nl2br
+
 
 # ═══════════════════════════════════════════════════════════════
 # ORGANIZER AUTH
@@ -510,6 +551,38 @@ def org_logout():
 # ORGANIZER DASHBOARD
 # ═══════════════════════════════════════════════════════════════
 
+@app.route("/org/profile", methods=["GET", "POST"])
+@require_organizer
+def org_profile():
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    org    = conn.execute("SELECT * FROM organizers WHERE id=?", (org_id,)).fetchone()
+    if request.method == "POST":
+        org_name    = request.form.get("org_name", "").strip()
+        tagline     = request.form.get("tagline", "").strip()
+        phone       = request.form.get("phone", "").strip()
+        website     = request.form.get("website", "").strip()
+        brand_color = request.form.get("brand_color", "#f5c842").strip()
+
+        logo_path = org["logo"]
+        new_logo  = save_upload(request.files.get("logo"), "logos")
+        if new_logo:
+            if logo_path:
+                delete_upload(logo_path)
+            logo_path = new_logo
+
+        conn.execute("""
+            UPDATE organizers SET org_name=?, tagline=?, phone=?, website=?, brand_color=?, logo=?
+            WHERE id=?
+        """, (org_name or org["org_name"], tagline, phone, website, brand_color, logo_path, org_id))
+        conn.commit(); conn.close()
+        flash("Brand profile updated!", "success")
+        return redirect(url_for("org_profile"))
+
+    conn.close()
+    return render_template("org_profile.html", org=org)
+
+
 @app.route("/org")
 @app.route("/org/dashboard")
 @require_organizer
@@ -561,13 +634,15 @@ def org_create_event():
     conn   = get_db()
     venues = conn.execute("SELECT * FROM venues WHERE organizer_id=? ORDER BY name", (org_id,)).fetchall()
     if request.method == "POST":
-        eid = new_id()
+        eid         = new_id()
+        cover_photo = save_upload(request.files.get("cover_photo"), "events")
+        payment_info = request.form.get("payment_info", "").strip()
         conn.execute(
-            "INSERT INTO events (id,organizer_id,title,description,event_date,event_time,venue_id,price,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO events (id,organizer_id,title,description,event_date,event_time,venue_id,price,cover_photo,payment_info,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (eid, org_id, request.form["title"], request.form.get("description",""),
              request.form["event_date"], request.form["event_time"],
              request.form["venue_id"], float(request.form["price"]),
-             datetime.now().isoformat()))
+             cover_photo, payment_info, datetime.now().isoformat()))
         conn.commit(); conn.close()
         flash("Event created! Add performers, photos and ticket tiers.", "success")
         return redirect(url_for("org_event_detail", event_id=eid))
@@ -593,6 +668,11 @@ def org_event_detail(event_id):
     performers = conn.execute("SELECT * FROM performers WHERE event_id=? ORDER BY created_at", (event_id,)).fetchall()
     photos     = conn.execute("SELECT * FROM event_photos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
     tiers      = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
+    venue_row_names = {}
+    if event["venue_id"]:
+        _v = conn.execute("SELECT row_names FROM venues WHERE id=?", (event["venue_id"],)).fetchone()
+        if _v:
+            venue_row_names = parse_row_names(_v)
     conn.close()
     booked_seats = get_booked_seats(event_id)
     row_letters  = list(LABELS[:event["rows"]]) if event["rows"] else []
@@ -600,7 +680,7 @@ def org_event_detail(event_id):
     return render_template("event_detail.html", event=event, bookings=bookings,
                            booked_seats=booked_seats, performers=performers,
                            photos=photos, tiers=tiers, row_letters=row_letters,
-                           row_config=row_config)
+                           row_config=row_config, row_names=venue_row_names)
 
 
 @app.route("/org/events/<event_id>/delete", methods=["POST"])
@@ -788,7 +868,9 @@ def org_venue_detail(venue_id):
     photos     = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC", (venue_id,)).fetchall()
     conn.close()
     row_config = parse_row_config(venue)
-    return render_template("venue_detail.html", venue=venue, photos=photos, row_config=row_config)
+    row_names  = parse_row_names(venue)
+    return render_template("venue_detail.html", venue=venue, photos=photos,
+                           row_config=row_config, row_names=row_names)
 
 
 @app.route("/org/venues/<venue_id>/rows", methods=["POST"])
@@ -802,20 +884,33 @@ def org_update_venue_rows(venue_id):
         conn.close(); flash("Venue not found.", "error")
         return redirect(url_for("org_venues_list"))
 
-    letters = list(LABELS[:venue["rows"]])
-    cfg = {}
-    for l in letters:
-        val = request.form.get(f"row_{l}", "").strip()
-        try:
-            cnt = max(1, int(val))
-        except ValueError:
-            cnt = venue["seats_per_row"]
-        cfg[l] = cnt
+    seat_counts = request.form.getlist("row_seats")
+    name_list   = request.form.getlist("row_name")
 
+    cfg   = {}
+    names = {}
+    for i, cnt_str in enumerate(seat_counts):
+        if i >= 26:
+            break
+        letter = LABELS[i]
+        try:
+            cnt = max(1, min(100, int(cnt_str)))
+        except ValueError:
+            cnt = 8
+        cfg[letter] = cnt
+        if i < len(name_list) and name_list[i].strip():
+            names[letter] = name_list[i].strip()
+
+    if not cfg:
+        flash("At least one row is required.", "error")
+        conn.close()
+        return redirect(url_for("org_venue_detail", venue_id=venue_id))
+
+    new_rows = len(cfg)
     capacity = row_config_capacity(cfg)
     conn.execute(
-        "UPDATE venues SET row_config=?, capacity=? WHERE id=?",
-        (json.dumps(cfg), capacity, venue_id))
+        "UPDATE venues SET rows=?, row_config=?, row_names=?, capacity=? WHERE id=?",
+        (new_rows, json.dumps(cfg), json.dumps(names), capacity, venue_id))
     conn.commit(); conn.close()
     flash("Seat layout saved!", "success")
     return redirect(url_for("org_venue_detail", venue_id=venue_id))
@@ -1013,7 +1108,8 @@ def index():
 def book_list():
     conn   = get_db()
     events = conn.execute("""
-        SELECT e.*, v.name as venue_name, v.capacity, o.org_name as organizer_name
+        SELECT e.*, v.name as venue_name, v.capacity,
+               o.org_name as organizer_name, o.brand_color as org_brand_color, o.logo as org_logo
         FROM events e
         LEFT JOIN venues v ON e.venue_id=v.id
         LEFT JOIN organizers o ON e.organizer_id=o.id
@@ -1024,17 +1120,20 @@ def book_list():
     events_data = []
     for ev in events:
         booked = len(get_booked_seats(ev["id"]))
-        cover  = conn.execute(
-            "SELECT filename FROM event_photos WHERE event_id=? ORDER BY created_at LIMIT 1",
-            (ev["id"],)).fetchone()
-        # min tier price for display
+        # Use event cover_photo first, fall back to first gallery photo
+        cover = ev["cover_photo"]
+        if not cover:
+            gallery = conn.execute(
+                "SELECT filename FROM event_photos WHERE event_id=? ORDER BY created_at LIMIT 1",
+                (ev["id"],)).fetchone()
+            cover = gallery["filename"] if gallery else None
         min_tier = conn.execute(
             "SELECT MIN(price) as mp FROM seat_tiers WHERE event_id=?", (ev["id"],)).fetchone()
-        has_tiers   = min_tier and min_tier["mp"] is not None
+        has_tiers     = min_tier and min_tier["mp"] is not None
         display_price = min_tier["mp"] if has_tiers else ev["price"]
         events_data.append({
             **dict(ev), "booked": booked,
-            "cover": cover["filename"] if cover else None,
+            "cover": cover,
             "display_price": display_price,
             "has_tiers": has_tiers,
         })
@@ -1048,7 +1147,9 @@ def book_event(event_id):
     event = conn.execute("""
         SELECT e.*, v.name as venue_name, v.location as venue_location,
                v.rows, v.seats_per_row, v.capacity, v.row_config, v.id as venue_db_id,
-               o.org_name as organizer_name
+               o.org_name as organizer_name, o.brand_color as org_brand_color,
+               o.logo as org_logo, o.tagline as org_tagline,
+               o.phone as org_phone, o.website as org_website
         FROM events e
         LEFT JOIN venues v ON e.venue_id=v.id
         LEFT JOIN organizers o ON e.organizer_id=o.id
@@ -1106,7 +1207,8 @@ def view_ticket(booking_id):
         conn.close(); flash("Booking not found.", "error")
         return redirect(url_for("book_list"))
     event = conn.execute("""
-        SELECT e.*, v.name as venue_name, v.location as venue_location, o.org_name as organizer_name
+        SELECT e.*, v.name as venue_name, v.location as venue_location,
+               o.org_name as organizer_name, o.brand_color as org_brand_color, o.logo as org_logo
         FROM events e LEFT JOIN venues v ON e.venue_id=v.id
         LEFT JOIN organizers o ON e.organizer_id=o.id WHERE e.id=?
     """, (booking["event_id"],)).fetchone()

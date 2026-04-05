@@ -1227,38 +1227,76 @@ a { color: inherit; text-decoration: none; }
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 10px;
+    margin-bottom: 14px;
 }
+
+/* Each row card — vertical stack so nothing overflows */
 .row-config-item {
     display: flex;
-    align-items: center;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
-    padding: 10px 14px;
+    padding: 12px 14px;
     transition: border-color 0.18s;
+    min-width: 0;
 }
 .row-config-item:hover { border-color: var(--accent-gold); }
 
-.row-config-label {
-    font-weight: 700;
-    font-size: 13px;
-    color: var(--text-primary);
-    min-width: 52px;
+/* Top row: letter + name input + remove */
+.row-config-header {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
-.row-config-tier-hint {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.5px;
+.row-config-letter {
+    font-family: var(--font-display);
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--accent-gold);
+    line-height: 1;
+    flex-shrink: 0;
+    min-width: 18px;
 }
-.row-config-controls {
+.row-config-name-input {
+    flex: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-family: var(--font-body);
+    outline: none;
+}
+.row-config-name-input::placeholder { color: var(--text-muted); }
+.row-config-name-input:focus { border-color: var(--accent-gold); }
+
+.row-config-remove-btn {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: border-color 0.15s, color 0.15s;
+}
+.row-config-remove-btn:hover { border-color: #ff6b6b; color: #ff6b6b; }
+
+/* Bottom row: seat controls */
+.row-config-controls-row {
     display: flex;
     align-items: center;
     gap: 4px;
-    flex: 1;
 }
 .row-count-btn {
     width: 28px; height: 28px;
@@ -1281,7 +1319,7 @@ a { color: inherit; text-decoration: none; }
     border-color: var(--accent-gold);
 }
 .row-count-input {
-    width: 52px;
+    width: 48px;
     text-align: center;
     padding: 5px 4px;
     border-radius: 6px;
@@ -1294,12 +1332,41 @@ a { color: inherit; text-decoration: none; }
     outline: none;
 }
 .row-count-input:focus { border-color: var(--accent-gold); }
-.row-config-seats-label {
+.row-config-seats-count {
     font-size: 11px;
     color: var(--text-muted);
-    min-width: 44px;
-    text-align: right;
+    margin-left: auto;
+    white-space: nowrap;
 }
+
+/* Footer row: add + save + total */
+.row-config-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+.row-config-total {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+.row-config-add-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+}
+.row-config-add-btn:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
 
 
 /* ══════════════════════════════════════════════
@@ -1440,7 +1507,9 @@ a { color: inherit; text-decoration: none; }
     .my-ticket-event  { font-size: 17px; }
 
     /* ── Row config editor ── */
-    .row-config-table { grid-template-columns: 1fr; }
+    .row-config-table  { grid-template-columns: 1fr 1fr; }
+    .row-config-footer { flex-wrap: wrap; }
+    .row-config-total  { margin-left: 0; }
 
     /* ── Tier table ── */
     .tiers-table .tier-row { flex-wrap: wrap; }
@@ -1487,9 +1556,8 @@ a { color: inherit; text-decoration: none; }
     .ticket-details   { grid-template-columns: 1fr; }
     .auth-card        { padding: 18px 12px; }
 
-    /* Row-config: single col, full-width items */
-    .row-config-item  { flex-wrap: wrap; gap: 6px; }
-    .row-config-seats-label { min-width: 0; }
+    /* Row-config: single col on tiny screens */
+    .row-config-table { grid-template-columns: 1fr; }
 }
 
 
@@ -1595,21 +1663,9 @@ a { color: inherit; text-decoration: none; }
 
 
 /* ══════════════════════════════════════════════
-   ROW-CONFIG — scrollable overflow fix for phones
+   SEAT MAP — horizontal scroll on narrow screens
 ══════════════════════════════════════════════ */
 @media (max-width: 600px) {
-    .row-config-table {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-    .row-config-item {
-        /* make controls full-width but stop text truncating */
-        min-width: 0;
-    }
-    .row-count-input {
-        width: 44px;
-    }
-    /* Seat map: horizontal scroll on narrow screens */
     .seat-map-container {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
@@ -1617,4 +1673,5 @@ a { color: inherit; text-decoration: none; }
     .seat-grid {
         min-width: max-content;
     }
+    .row-count-input { width: 44px; }
 }

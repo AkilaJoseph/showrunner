@@ -10,8 +10,8 @@
             <h2 class="page-title" style="margin-bottom:4px">{{ venue.name }}</h2>
             <p style="color:var(--accent-purple);font-size:13px">📍 {{ venue.location }}</p>
             <div class="tags" style="margin-top:10px">
-                <span class="tag">{{ venue.rows }} rows</span>
-                <span class="tag tag-gold">{{ venue.capacity }} total seats</span>
+                <span class="tag" id="row-count-tag">{{ venue.rows }} rows</span>
+                <span class="tag tag-gold" id="capacity-tag">{{ venue.capacity }} total seats</span>
             </div>
         </div>
         <form method="POST" action="{{ url_for('org_delete_venue', venue_id=venue.id) }}"
@@ -25,43 +25,23 @@
 <div class="card" style="margin-bottom:20px">
     <p class="section-title">🪑 Seat Layout
         <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
-            Set how many seats are in each row — rows can have different counts (e.g. Sofa = 2, Regular = 8)
+            Name each row (e.g. Sofa, VIP, Regular) and set its seat count. Add or remove rows freely.
         </span>
     </p>
 
-    <form method="POST" action="{{ url_for('org_update_venue_rows', venue_id=venue.id) }}">
-        <div class="row-config-table">
-            {% for letter, count in row_config.items() %}
-            <div class="row-config-item">
-                <div class="row-config-label" id="label-{{ letter }}">
-                    Row {{ letter }}
-                    <span class="row-config-tier-hint" id="tier-hint-{{ letter }}"></span>
-                </div>
-                <div class="row-config-controls">
-                    <button type="button" class="row-count-btn"
-                            onclick="adjustRow('{{ letter }}', -1)">−</button>
-                    <input type="number" name="row_{{ letter }}"
-                           id="row-input-{{ letter }}"
-                           value="{{ count }}" min="1" max="30"
-                           class="row-count-input"
-                           onchange="updatePreview()">
-                    <button type="button" class="row-count-btn"
-                            onclick="adjustRow('{{ letter }}', 1)">+</button>
-                </div>
-                <span class="row-config-seats-label" id="seats-label-{{ letter }}">{{ count }} seats</span>
-            </div>
-            {% endfor %}
-        </div>
-        <div style="display:flex;align-items:center;gap:12px;margin-top:16px">
+    <form method="POST" action="{{ url_for('org_update_venue_rows', venue_id=venue.id) }}" id="row-form">
+        <!-- Rows rendered by JS below -->
+        <div class="row-config-table" id="row-config-list"></div>
+
+        <div class="row-config-footer">
+            <button type="button" class="row-config-add-btn" onclick="addRow()">＋ Add Row</button>
             <button type="submit" class="btn btn-primary">Save Layout</button>
-            <span style="font-size:12px;color:var(--text-muted)" id="total-capacity-hint">
-                Total: {{ venue.capacity }} seats
-            </span>
+            <span class="row-config-total" id="total-capacity-hint">Total: {{ venue.capacity }} seats</span>
         </div>
     </form>
 
     <!-- Live preview -->
-    <div style="margin-top:20px">
+    <div style="margin-top:24px">
         <p class="section-title" style="margin-bottom:8px">Preview</p>
         <div class="seat-map-container" id="seat-map-preview"></div>
     </div>
@@ -112,46 +92,144 @@
 
 {% block scripts %}
 <script>
-const rowConfig = {{ row_config | tojson }};
-const venueRows = {{ venue.rows }};
+// ── Data from server ──────────────────────────────────────────
+const INIT_CONFIG = {{ row_config | tojson }};
+const INIT_NAMES  = {{ row_names  | tojson }};
+const LABELS      = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-function adjustRow(letter, delta) {
-    const input = document.getElementById('row-input-' + letter);
-    const newVal = Math.max(1, Math.min(30, parseInt(input.value || 1) + delta));
-    input.value = newVal;
-    updatePreview();
+// Build mutable rows array from server data
+let rows = Object.keys(INIT_CONFIG).map((l, i) => ({
+    seats: INIT_CONFIG[l],
+    name:  INIT_NAMES[l] || '',
+}));
+
+// ── Render all rows into #row-config-list ─────────────────────
+function renderRows() {
+    const list = document.getElementById('row-config-list');
+    list.innerHTML = '';
+
+    rows.forEach((row, i) => {
+        const letter = LABELS[i];
+        const div    = document.createElement('div');
+        div.className = 'row-config-item';
+
+        // Escape for safe HTML attribute insertion
+        const safeName = row.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+        const safeSeats = Math.max(1, Math.min(100, row.seats));
+
+        div.innerHTML = `
+            <div class="row-config-header">
+                <span class="row-config-letter">${letter}</span>
+                <input type="text"
+                       name="row_name"
+                       value="${safeName}"
+                       class="row-config-name-input"
+                       placeholder="Row name (e.g. Sofa, VIP, Regular)"
+                       data-idx="${i}">
+                <button type="button" class="row-config-remove-btn"
+                        data-idx="${i}" title="Remove this row">✕</button>
+            </div>
+            <div class="row-config-controls-row">
+                <button type="button" class="row-count-btn" data-adj="${i}" data-delta="-1">−</button>
+                <input type="number"
+                       name="row_seats"
+                       value="${safeSeats}"
+                       min="1" max="100"
+                       class="row-count-input"
+                       data-idx="${i}">
+                <button type="button" class="row-count-btn" data-adj="${i}" data-delta="1">+</button>
+                <span class="row-config-seats-count" id="slbl-${i}">${safeSeats} seat${safeSeats===1?'':'s'}</span>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+
+    // Wire events on freshly rendered elements
+    list.querySelectorAll('[data-adj]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const i = +btn.dataset.adj, d = +btn.dataset.delta;
+            rows[i].seats = Math.max(1, Math.min(100, rows[i].seats + d));
+            // Update input and label without full re-render
+            const inputs = list.querySelectorAll('input[name="row_seats"]');
+            if (inputs[i]) inputs[i].value = rows[i].seats;
+            const lbl = document.getElementById('slbl-' + i);
+            if (lbl) lbl.textContent = rows[i].seats + ' seat' + (rows[i].seats === 1 ? '' : 's');
+            updateTotals();
+        });
+    });
+
+    list.querySelectorAll('.row-config-remove-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const i = +btn.dataset.idx;
+            if (rows.length <= 1) { alert('A venue must have at least one row.'); return; }
+            rows.splice(i, 1);
+            renderRows();
+        });
+    });
+
+    list.querySelectorAll('input[name="row_name"]').forEach(inp => {
+        inp.addEventListener('input', () => { rows[+inp.dataset.idx].name = inp.value; });
+    });
+
+    list.querySelectorAll('input[name="row_seats"]').forEach(inp => {
+        inp.addEventListener('input', () => {
+            const i = +inp.dataset.idx;
+            rows[i].seats = Math.max(1, parseInt(inp.value) || 1);
+            const lbl = document.getElementById('slbl-' + i);
+            if (lbl) lbl.textContent = rows[i].seats + ' seat' + (rows[i].seats === 1 ? '' : 's');
+            updateTotals();
+        });
+    });
+
+    updateTotals();
 }
 
-function updatePreview() {
-    const cfg = {};
-    let total = 0;
-    Object.keys(rowConfig).forEach(l => {
-        const v = parseInt(document.getElementById('row-input-' + l).value) || 1;
-        cfg[l] = v;
-        total += v;
-        document.getElementById('seats-label-' + l).textContent = v + ' seat' + (v === 1 ? '' : 's');
-    });
-    document.getElementById('total-capacity-hint').textContent = 'Total: ' + total.toLocaleString() + ' seats';
+// ── Add a new row ─────────────────────────────────────────────
+function addRow() {
+    if (rows.length >= 26) { alert('Maximum 26 rows (A–Z).'); return; }
+    rows.push({ seats: 8, name: '' });
+    renderRows();
+    // Scroll the new row into view and focus its name input
+    const items = document.querySelectorAll('.row-config-item');
+    const last  = items[items.length - 1];
+    if (last) {
+        last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        const nameInput = last.querySelector('input[name="row_name"]');
+        if (nameInput) nameInput.focus();
+    }
+}
 
-    buildSeatMap("seat-map-preview", {
-        rows:        venueRows,
+// ── Update totals + preview ───────────────────────────────────
+function updateTotals() {
+    const total = rows.reduce((s, r) => s + r.seats, 0);
+
+    const hint = document.getElementById('total-capacity-hint');
+    if (hint) hint.textContent = 'Total: ' + total.toLocaleString() + ' seats';
+
+    const capTag = document.getElementById('capacity-tag');
+    if (capTag) capTag.textContent = total.toLocaleString() + ' total seats';
+
+    const rowTag = document.getElementById('row-count-tag');
+    if (rowTag) rowTag.textContent = rows.length + ' row' + (rows.length === 1 ? '' : 's');
+
+    // Build rowConfig for seat map
+    const cfg = {};
+    rows.forEach((r, i) => { cfg[LABELS[i]] = r.seats; });
+
+    buildSeatMap('seat-map-preview', {
+        rows:        rows.length,
         rowConfig:   cfg,
         bookedSeats: [],
         selectable:  false,
     });
 }
 
-// Initial preview render
-buildSeatMap("seat-map-preview", {
-    rows:        venueRows,
-    rowConfig:   rowConfig,
-    bookedSeats: [],
-    selectable:  false,
-});
-
 function previewLabel(input, zoneId) {
     if (input.files && input.files[0])
         document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
 }
+
+// Initial render
+renderRows();
 </script>
 {% endblock %}
