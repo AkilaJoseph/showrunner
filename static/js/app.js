@@ -251,10 +251,8 @@ function formatVerifyInput(input) {
 
 
 // ── PWA: Push Notification Permission Button ──────────────────
-// Attach to any element with data-push-btn to trigger permission request
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-push-btn]").forEach(btn => {
-        // Hide button if already subscribed or not supported
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
             btn.style.display = "none";
             return;
@@ -271,3 +269,196 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 });
+
+
+// ── Global Lightbox ───────────────────────────────────────────
+// Usage:
+//   LB.open(items, startIndex)
+//   items: [{ type:'image'|'video'|'embed', src, caption, download }]
+(function() {
+    const overlay  = document.getElementById('lb-overlay');
+    if (!overlay) return;
+
+    const media    = document.getElementById('lb-media');
+    const footer   = document.getElementById('lb-footer');
+    const caption  = document.getElementById('lb-caption');
+    const counter  = document.getElementById('lb-counter');
+    const closeBtn = document.getElementById('lb-close');
+    const prevBtn  = document.getElementById('lb-prev');
+    const nextBtn  = document.getElementById('lb-next');
+
+    let items   = [];
+    let current = 0;
+    let activeVid = null;
+
+    function stopActiveVid() {
+        if (activeVid) { activeVid.pause(); activeVid = null; }
+    }
+
+    function show(idx) {
+        stopActiveVid();
+        current = ((idx % items.length) + items.length) % items.length;
+        const item = items[current];
+
+        // Counter
+        counter.textContent = items.length > 1 ? `${current + 1} / ${items.length}` : '';
+
+        // Nav visibility
+        prevBtn.classList.toggle('lb-hidden', items.length <= 1);
+        nextBtn.classList.toggle('lb-hidden', items.length <= 1);
+
+        // Render media
+        media.innerHTML = '';
+        if (item.type === 'image') {
+            const img = document.createElement('img');
+            img.src = item.src;
+            img.alt = item.caption || '';
+            media.appendChild(img);
+        } else if (item.type === 'video') {
+            const vid = document.createElement('video');
+            vid.src = item.src;
+            vid.controls = true;
+            vid.autoplay = true;
+            vid.playsInline = true;
+            media.appendChild(vid);
+            activeVid = vid;
+        } else if (item.type === 'embed') {
+            const fr = document.createElement('iframe');
+            fr.src = item.src;
+            fr.allowFullscreen = true;
+            fr.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            media.appendChild(fr);
+        }
+
+        // Caption & action buttons
+        caption.textContent = item.caption || '';
+        // Remove old action buttons, keep caption
+        footer.querySelectorAll('.lb-action-btn').forEach(b => b.remove());
+
+        if (item.download && item.type === 'image') {
+            const a = document.createElement('a');
+            a.className = 'lb-action-btn lb-download';
+            a.href = item.download;
+            a.download = '';
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.innerHTML = '<i class="bi bi-download"></i> Save Photo';
+            footer.appendChild(a);
+        }
+        if (item.type === 'video' && item.src) {
+            const a = document.createElement('a');
+            a.className = 'lb-action-btn lb-download';
+            a.href = item.src;
+            a.download = '';
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.innerHTML = '<i class="bi bi-download"></i> Save Video';
+            footer.appendChild(a);
+        }
+    }
+
+    function open(newItems, startIndex) {
+        items   = newItems;
+        overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        show(startIndex || 0);
+    }
+
+    function close() {
+        stopActiveVid();
+        overlay.classList.remove('open');
+        document.body.style.overflow = '';
+        media.innerHTML = '';
+        items = [];
+    }
+
+    closeBtn.addEventListener('click', close);
+    prevBtn.addEventListener('click', () => show(current - 1));
+    nextBtn.addEventListener('click', () => show(current + 1));
+
+    // Click backdrop to close
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+    // Keyboard nav
+    document.addEventListener('keydown', e => {
+        if (!overlay.classList.contains('open')) return;
+        if (e.key === 'Escape')      close();
+        if (e.key === 'ArrowLeft')   show(current - 1);
+        if (e.key === 'ArrowRight')  show(current + 1);
+    });
+
+    // Touch swipe
+    let touchX = null;
+    overlay.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+    overlay.addEventListener('touchend', e => {
+        if (touchX === null) return;
+        const dx = e.changedTouches[0].clientX - touchX;
+        if (Math.abs(dx) > 50) show(dx < 0 ? current + 1 : current - 1);
+        touchX = null;
+    });
+
+    // Expose globally
+    window.LB = { open };
+
+    // ── Auto-wire public photo grids ──────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        // Public photo grids — .photo-item-public
+        document.querySelectorAll('.photo-grid-public').forEach(grid => {
+            const imgs = [...grid.querySelectorAll('.photo-item-public img')];
+            const lbItems = imgs.map(img => ({
+                type:     'image',
+                src:      img.src,
+                caption:  img.alt || '',
+                download: img.src,
+            }));
+            imgs.forEach((img, i) => {
+                img.closest('.photo-item-public').addEventListener('click', () => {
+                    LB.open(lbItems, i);
+                });
+            });
+        });
+
+        // Organizer photo grids — .photo-item (no delete btn interference)
+        document.querySelectorAll('.photo-grid').forEach(grid => {
+            const items = [...grid.querySelectorAll('.photo-item')];
+            const lbItems = items.map(item => {
+                const img = item.querySelector('img');
+                const cap = item.querySelector('.photo-caption');
+                return img ? { type:'image', src:img.src, caption: cap ? cap.textContent : '', download: img.src } : null;
+            }).filter(Boolean);
+            items.forEach((item, i) => {
+                if (!lbItems[i]) return;
+                const img = item.querySelector('img');
+                if (!img) return;
+                img.style.cursor = 'zoom-in';
+                img.addEventListener('click', (e) => {
+                    e.stopPropagation(); // don't trigger delete form
+                    LB.open(lbItems, i);
+                });
+            });
+        });
+
+        // Videos: .pub-video-item — open in lightbox instead of inline play
+        document.querySelectorAll('.pub-video-reel').forEach(reel => {
+            const vidItems = [...reel.querySelectorAll('.pub-video-item')];
+            const lbItems = vidItems.map(item => {
+                const vid = item.querySelector('.pub-video-player');
+                const fr  = item.querySelector('.pub-video-iframe');
+                const lbl = item.querySelector('.pub-video-label');
+                if (vid) return { type: 'video',  src: vid.src,  caption: lbl ? lbl.textContent : '' };
+                if (fr)  return { type: 'embed',  src: fr.src,   caption: lbl ? lbl.textContent : '' };
+                return null;
+            }).filter(Boolean);
+
+            vidItems.forEach((item, i) => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Pause the inline player if it was playing
+                    const vid = item.querySelector('.pub-video-player');
+                    if (vid) vid.pause();
+                    LB.open(lbItems, i);
+                });
+            });
+        });
+    });
+})();

@@ -154,7 +154,7 @@
                    loop
                    poster="">
             </video>
-            <div class="pub-video-play-btn">▶</div>
+            <div class="pub-video-play-btn"><i class="bi bi-play-circle-fill"></i></div>
             {% else %}
             <div class="pub-video-embed-wrap">
                 <iframe src="{{ v.embed_url }}"
@@ -268,35 +268,8 @@ document.getElementById("booking-form").addEventListener("submit", function(e) {
         'https://wa.me/?text=' + encodeURIComponent(msg);
 })();
 
-// ── Video reel: tap-to-play / pause ──────────────────────────
-document.querySelectorAll('.pub-video-item').forEach(item => {
-    const vid = item.querySelector('.pub-video-player');
-    const btn = item.querySelector('.pub-video-play-btn');
-    if (!vid) return;
-    item.addEventListener('click', () => {
-        if (vid.paused) {
-            // Pause all others first
-            document.querySelectorAll('.pub-video-player').forEach(v => { if(v !== vid) { v.pause(); v.closest('.pub-video-item').querySelector('.pub-video-play-btn').style.display = 'flex'; }});
-            vid.play();
-            btn.style.display = 'none';
-        } else {
-            vid.pause();
-            btn.style.display = 'flex';
-        }
-    });
-    vid.addEventListener('ended', () => { btn.style.display = 'flex'; });
-});
-
-// Auto-play first uploaded clip when it scrolls into view
-const firstVid = document.querySelector('.pub-video-player');
-if (firstVid && 'IntersectionObserver' in window) {
-    new IntersectionObserver((entries) => {
-        entries.forEach(e => {
-            if (e.isIntersecting) { e.target.play().catch(()=>{}); e.target.closest('.pub-video-item').querySelector('.pub-video-play-btn').style.display='none'; }
-            else { e.target.pause(); }
-        });
-    }, { threshold: 0.6 }).observe(firstVid);
-}
+// Video reel items open in lightbox (wired by LB in app.js)
+// Play buttons are cosmetic only — clicking opens fullscreen
 
 // Copy link
 function copyEventLink(btn) {

@@ -154,6 +154,18 @@
 </main>
 {% endif %}
 
+<!-- ── Global Lightbox ── -->
+<div class="lb-overlay" id="lb-overlay" role="dialog" aria-modal="true">
+    <button class="lb-close" id="lb-close" aria-label="Close"><i class="bi bi-x-lg"></i></button>
+    <span class="lb-counter" id="lb-counter"></span>
+    <button class="lb-nav lb-prev" id="lb-prev" aria-label="Previous"><i class="bi bi-chevron-left"></i></button>
+    <button class="lb-nav lb-next" id="lb-next" aria-label="Next"><i class="bi bi-chevron-right"></i></button>
+    <div class="lb-media" id="lb-media"></div>
+    <div class="lb-footer" id="lb-footer">
+        <span class="lb-caption" id="lb-caption"></span>
+    </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
 // ── Sidebar ──────────────────────────────────────────────────
