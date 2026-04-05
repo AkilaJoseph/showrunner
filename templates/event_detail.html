@@ -206,6 +206,76 @@
     </form>
 </div>
 
+<!-- ── Video Clips ── -->
+<div class="card">
+    <p class="section-title">🎬 Video Clips
+        <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">Upload short clips or paste YouTube / TikTok / Instagram links</span>
+    </p>
+
+    {% if videos %}
+    <div class="org-video-grid">
+        {% for v in videos %}
+        <div class="org-video-item">
+            {% if v.filename %}
+            <video src="{{ url_for('static', filename=v.filename) }}"
+                   controls muted playsinline preload="metadata"
+                   class="org-video-player"></video>
+            {% else %}
+            <div class="org-video-embed-wrap">
+                <iframe src="{{ v.embed_url }}" frameborder="0" allowfullscreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        class="org-video-iframe"></iframe>
+            </div>
+            {% endif %}
+            <div class="org-video-meta">
+                <span class="org-video-title">{{ v.title or ('Clip' if v.filename else 'Linked video') }}</span>
+                <span class="org-video-type">{{ '📁 uploaded' if v.filename else '🔗 linked' }}</span>
+            </div>
+            <form method="POST" action="{{ url_for('org_delete_event_video', event_id=event.id, video_id=v.id) }}"
+                  onsubmit="return confirm('Remove this video?')" style="margin-top:6px">
+                <button class="btn btn-danger" style="width:100%;font-size:11px;justify-content:center;padding:6px">Remove</button>
+            </form>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="margin-bottom:16px">No clips yet. Add a highlight reel to hype your next show!</div>
+    {% endif %}
+
+    <details class="upload-details" {% if not videos %}open{% endif %}>
+        <summary class="upload-details-summary">+ Add Video</summary>
+        <form method="POST" action="{{ url_for('org_add_event_video', event_id=event.id) }}"
+              enctype="multipart/form-data" style="margin-top:14px">
+            <div class="field">
+                <label>Title <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+                <input type="text" name="title" placeholder="e.g. Opening night highlights, crowd reaction…">
+            </div>
+
+            <div class="video-add-tabs" id="video-add-tabs">
+                <button type="button" class="video-tab active" data-tab="upload" onclick="switchVideoTab('upload',this)">📁 Upload Clip</button>
+                <button type="button" class="video-tab" data-tab="link" onclick="switchVideoTab('link',this)">🔗 Paste Link</button>
+            </div>
+
+            <div id="video-tab-upload" class="video-tab-panel">
+                <div class="field" style="margin-top:10px">
+                    <label>Video File <span style="color:var(--text-muted);font-weight:400;font-size:11px">MP4, WEBM, MOV (max 50 MB recommended)</span></label>
+                    <input type="file" name="clip" accept="video/mp4,video/webm,video/quicktime,.mov,.m4v" class="file-input-plain">
+                </div>
+            </div>
+
+            <div id="video-tab-link" class="video-tab-panel" style="display:none">
+                <div class="field" style="margin-top:10px">
+                    <label>YouTube / TikTok / Instagram link</label>
+                    <input type="url" name="embed_link" placeholder="https://www.youtube.com/watch?v=…">
+                    <span class="field-hint">Paste the share URL — we'll embed it automatically</span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top:12px">Add Video</button>
+        </form>
+    </details>
+</div>
+
 <!-- ── Bookings ── -->
 <div class="card">
     <p class="section-title">Bookings ({{ bookings|length }})</p>
@@ -257,6 +327,13 @@ document.querySelectorAll('.color-preset-label').forEach(label => {
 function previewLabel(input, zoneId) {
     if (input.files && input.files[0])
         document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
+}
+
+function switchVideoTab(tab, btn) {
+    document.querySelectorAll('.video-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.video-tab-panel').forEach(p => p.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById('video-tab-' + tab).style.display = 'block';
 }
 </script>
 {% endblock %}

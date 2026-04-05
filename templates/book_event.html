@@ -140,6 +140,39 @@
 </div>
 {% endif %}
 
+<!-- ── Video Highlights ── -->
+{% if event_videos %}
+<div class="card" style="margin-bottom:22px;padding:20px 20px 16px">
+    <p class="section-title" style="margin-bottom:16px">🎬 Highlights</p>
+    <div class="pub-video-reel" id="video-reel">
+        {% for v in event_videos %}
+        <div class="pub-video-item" data-src="{{ url_for('static', filename=v.filename) if v.filename else '' }}">
+            {% if v.filename %}
+            <video class="pub-video-player"
+                   src="{{ url_for('static', filename=v.filename) }}"
+                   muted playsinline preload="metadata"
+                   loop
+                   poster="">
+            </video>
+            <div class="pub-video-play-btn">▶</div>
+            {% else %}
+            <div class="pub-video-embed-wrap">
+                <iframe src="{{ v.embed_url }}"
+                        frameborder="0" allowfullscreen
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        loading="lazy"
+                        class="pub-video-iframe"></iframe>
+            </div>
+            {% endif %}
+            {% if v.title %}
+            <p class="pub-video-label">{{ v.title }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- ── Seat Map ── -->
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🪑 Select Your Seats</p>
@@ -234,6 +267,36 @@ document.getElementById("booking-form").addEventListener("submit", function(e) {
     document.getElementById('wa-share-btn').href =
         'https://wa.me/?text=' + encodeURIComponent(msg);
 })();
+
+// ── Video reel: tap-to-play / pause ──────────────────────────
+document.querySelectorAll('.pub-video-item').forEach(item => {
+    const vid = item.querySelector('.pub-video-player');
+    const btn = item.querySelector('.pub-video-play-btn');
+    if (!vid) return;
+    item.addEventListener('click', () => {
+        if (vid.paused) {
+            // Pause all others first
+            document.querySelectorAll('.pub-video-player').forEach(v => { if(v !== vid) { v.pause(); v.closest('.pub-video-item').querySelector('.pub-video-play-btn').style.display = 'flex'; }});
+            vid.play();
+            btn.style.display = 'none';
+        } else {
+            vid.pause();
+            btn.style.display = 'flex';
+        }
+    });
+    vid.addEventListener('ended', () => { btn.style.display = 'flex'; });
+});
+
+// Auto-play first uploaded clip when it scrolls into view
+const firstVid = document.querySelector('.pub-video-player');
+if (firstVid && 'IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+            if (e.isIntersecting) { e.target.play().catch(()=>{}); e.target.closest('.pub-video-item').querySelector('.pub-video-play-btn').style.display='none'; }
+            else { e.target.pause(); }
+        });
+    }, { threshold: 0.6 }).observe(firstVid);
+}
 
 // Copy link
 function copyEventLink(btn) {

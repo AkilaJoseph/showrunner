@@ -715,6 +715,7 @@ def org_event_detail(event_id):
     bookings   = conn.execute("SELECT * FROM bookings WHERE event_id=? ORDER BY booked_at DESC", (event_id,)).fetchall()
     performers = conn.execute("SELECT * FROM performers WHERE event_id=? ORDER BY created_at", (event_id,)).fetchall()
     photos     = conn.execute("SELECT * FROM event_photos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
+    videos     = conn.execute("SELECT * FROM event_videos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
     tiers      = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
     venue_row_names = {}
     if event["venue_id"]:
@@ -727,7 +728,7 @@ def org_event_detail(event_id):
     row_config   = parse_row_config(event)
     return render_template("event_detail.html", event=event, bookings=bookings,
                            booked_seats=booked_seats, performers=performers,
-                           photos=photos, tiers=tiers, row_letters=row_letters,
+                           photos=photos, videos=videos, tiers=tiers, row_letters=row_letters,
                            row_config=row_config, row_names=venue_row_names)
 
 
@@ -741,11 +742,14 @@ def org_delete_event(event_id):
             delete_upload(r["filename"])
         for r in conn.execute("SELECT photo FROM performers WHERE event_id=? AND photo IS NOT NULL", (event_id,)).fetchall():
             delete_upload(r["photo"])
-        conn.execute("DELETE FROM bookings    WHERE event_id=?", (event_id,))
-        conn.execute("DELETE FROM performers  WHERE event_id=?", (event_id,))
+        for r in conn.execute("SELECT filename FROM event_videos WHERE event_id=? AND filename IS NOT NULL", (event_id,)).fetchall():
+            delete_upload(r["filename"])
+        conn.execute("DELETE FROM bookings     WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM performers   WHERE event_id=?", (event_id,))
         conn.execute("DELETE FROM event_photos WHERE event_id=?", (event_id,))
-        conn.execute("DELETE FROM seat_tiers  WHERE event_id=?", (event_id,))
-        conn.execute("DELETE FROM events      WHERE id=?",        (event_id,))
+        conn.execute("DELETE FROM event_videos WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM seat_tiers   WHERE event_id=?", (event_id,))
+        conn.execute("DELETE FROM events       WHERE id=?",        (event_id,))
         conn.commit(); flash("Event deleted.", "success")
     conn.close()
     return redirect(url_for("org_events_list"))
@@ -1015,6 +1019,62 @@ def org_delete_venue(venue_id):
     return redirect(url_for("org_venues_list"))
 
 
+# ─── Event Video Clips ───────────────────────────────────────
+
+@app.route("/org/events/<event_id>/videos/add", methods=["POST"])
+@require_organizer
+def org_add_event_video(event_id):
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    if not conn.execute("SELECT id FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone():
+        conn.close(); flash("Event not found.", "error")
+        return redirect(url_for("org_events_list"))
+
+    title     = request.form.get("title", "").strip()
+    file_path = save_video(request.files.get("clip"))
+    raw_link  = request.form.get("embed_link", "").strip()
+    embed_url = None
+
+    if file_path:
+        conn.execute(
+            "INSERT INTO event_videos (id,event_id,filename,embed_url,title,created_at) VALUES(?,?,?,?,?,?)",
+            (new_id(), event_id, file_path, None, title, datetime.now().isoformat()))
+        conn.commit(); conn.close()
+        flash("Video clip added!", "success")
+    elif raw_link:
+        embed_url = extract_embed_url(raw_link)
+        if not embed_url:
+            conn.close(); flash("Could not parse that link. Paste a YouTube, TikTok, or Instagram URL.", "error")
+            return redirect(url_for("org_event_detail", event_id=event_id))
+        conn.execute(
+            "INSERT INTO event_videos (id,event_id,filename,embed_url,title,created_at) VALUES(?,?,?,?,?,?)",
+            (new_id(), event_id, None, embed_url, title, datetime.now().isoformat()))
+        conn.commit(); conn.close()
+        flash("Video link added!", "success")
+    else:
+        conn.close(); flash("Please upload a clip or paste a link.", "error")
+
+    return redirect(url_for("org_event_detail", event_id=event_id))
+
+
+@app.route("/org/events/<event_id>/videos/<video_id>/delete", methods=["POST"])
+@require_organizer
+def org_delete_event_video(event_id, video_id):
+    org_id = session["organizer_id"]
+    conn   = get_db()
+    row    = conn.execute("""
+        SELECT ev.* FROM event_videos ev JOIN events e ON ev.event_id=e.id
+        WHERE ev.id=? AND e.organizer_id=?
+    """, (video_id, org_id)).fetchone()
+    if row:
+        if row["filename"]:
+            delete_upload(row["filename"])
+        conn.execute("DELETE FROM event_videos WHERE id=?", (video_id,))
+        conn.commit()
+    conn.close()
+    return redirect(url_for("org_event_detail", event_id=event_id))
+
+
 # ═══════════════════════════════════════════════════════════════
 # ORGANIZER — BOOKINGS & VERIFY
 # ═══════════════════════════════════════════════════════════════
@@ -1242,6 +1302,7 @@ def book_event(event_id):
     tiers        = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
     performers   = conn.execute("SELECT * FROM performers WHERE event_id=? ORDER BY created_at", (event_id,)).fetchall()
     event_photos = conn.execute("SELECT * FROM event_photos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
+    event_videos = conn.execute("SELECT * FROM event_videos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
     venue_photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC",
                                 (event["venue_db_id"],)).fetchall() if event["venue_db_id"] else []
 
@@ -1273,8 +1334,8 @@ def book_event(event_id):
     conn.close()
     return render_template("book_event.html", event=event, booked_seats=booked_seats,
                            tiers=tiers, performers=performers,
-                           event_photos=event_photos, venue_photos=venue_photos,
-                           row_config=row_config)
+                           event_photos=event_photos, event_videos=event_videos,
+                           venue_photos=venue_photos, row_config=row_config)
 
 
 @app.route("/ticket/<booking_id>")

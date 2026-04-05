@@ -4,25 +4,30 @@
 <h2 class="page-title">Dashboard</h2>
 
 <div class="stats-grid">
-    <div class="stat-card animate-in" style="animation-delay: 0s">
+    <div class="stat-card animate-in" style="animation-delay:0s;--sc:var(--accent-purple)">
+        <i class="bi bi-calendar-event-fill stat-bg-icon"></i>
+        <p class="stat-value">{{ stats.total_events }}</p>
         <p class="stat-label">Total Events</p>
-        <p class="stat-value stat-purple">{{ stats.total_events }}</p>
     </div>
-    <div class="stat-card animate-in" style="animation-delay: 0.06s">
+    <div class="stat-card animate-in" style="animation-delay:0.06s;--sc:var(--accent-gold)">
+        <i class="bi bi-calendar-check-fill stat-bg-icon"></i>
+        <p class="stat-value">{{ stats.upcoming }}</p>
         <p class="stat-label">Upcoming</p>
-        <p class="stat-value stat-gold">{{ stats.upcoming }}</p>
     </div>
-    <div class="stat-card animate-in" style="animation-delay: 0.12s">
+    <div class="stat-card animate-in" style="animation-delay:0.12s;--sc:var(--accent-teal)">
+        <i class="bi bi-ticket-perforated-fill stat-bg-icon"></i>
+        <p class="stat-value">{{ stats.total_bookings }}</p>
         <p class="stat-label">Bookings</p>
-        <p class="stat-value stat-teal">{{ stats.total_bookings }}</p>
     </div>
-    <div class="stat-card animate-in" style="animation-delay: 0.18s">
-        <p class="stat-label">Revenue</p>
-        <p class="stat-value stat-red">{{ stats.total_revenue }} <span style="font-size:12px;color:var(--text-secondary)">TZS</span></p>
+    <div class="stat-card animate-in" style="animation-delay:0.18s;--sc:var(--accent-red)">
+        <i class="bi bi-cash-stack stat-bg-icon"></i>
+        <p class="stat-value">{{ "{:,.0f}".format(stats.total_revenue|float) }}</p>
+        <p class="stat-label">Revenue · TZS</p>
     </div>
-    <div class="stat-card animate-in" style="animation-delay: 0.24s">
+    <div class="stat-card animate-in" style="animation-delay:0.24s;--sc:var(--accent-green)">
+        <i class="bi bi-patch-check-fill stat-bg-icon"></i>
+        <p class="stat-value">{{ stats.verified }}</p>
         <p class="stat-label">Verified</p>
-        <p class="stat-value stat-green">{{ stats.verified }}</p>
     </div>
 </div>
 
@@ -38,7 +43,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:8px">
             <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}">
-                {% if b.verified %}✓ Verified{% else %}Pending{% endif %}
+                {% if b.verified %}<i class="bi bi-patch-check-fill"></i> Verified{% else %}Pending{% endif %}
             </span>
             <span class="booking-code">{{ b.code }}</span>
         </div>
