@@ -6,7 +6,10 @@
 
     <!-- Header -->
     <div class="verify-header">
-        <h2 class="verify-heading">🎫 Ticket Verification</h2>
+        <h2 class="verify-heading">
+            <i class="bi bi-patch-check-fill" style="color:var(--accent-teal);font-size:28px;vertical-align:middle;margin-right:8px"></i>
+            Ticket Verification
+        </h2>
         <p class="verify-sub">Scan QR code or type the 6-character code</p>
     </div>
 
@@ -21,11 +24,24 @@
                 <div class="scanner-corner br"></div>
                 <div class="scanner-laser" id="scanner-laser"></div>
             </div>
+            <!-- Centered aim reticle shown before camera starts -->
+            <div class="scanner-idle" id="scanner-idle">
+                <i class="bi bi-qr-code-scan"></i>
+                <p>Camera off</p>
+            </div>
             <p class="scanner-hint">Point camera at the QR code on the ticket</p>
         </div>
-        <button class="btn btn-secondary btn-full" id="toggle-scanner-btn" style="margin-top:12px">
-            📷 Start Camera Scanner
+
+        <button class="scanner-toggle-btn" id="toggle-scanner-btn">
+            <i class="bi bi-camera-fill"></i> Start Camera
         </button>
+
+        <!-- Shown only when camera is unavailable (HTTP / no permission) -->
+        <div class="scanner-https-note" id="scanner-https-note" style="display:none">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            Camera requires <strong>HTTPS</strong>. Access this page via
+            <code>https://</code> or use the manual code below.
+        </div>
     </div>
 
     <!-- ── Divider ── -->
@@ -35,7 +51,7 @@
     <div class="verify-manual-card">
         <div class="verify-input-wrap">
             <input type="text" id="code-input" class="verify-code-input"
-                   placeholder="e.g. ABX4K9"
+                   placeholder="ABX4K9"
                    maxlength="14"
                    autocomplete="off"
                    autocorrect="off"
@@ -44,17 +60,17 @@
                    inputmode="text"
                    autofocus>
             <button class="verify-submit-btn" id="verify-btn" onclick="submitCode()">
-                ✓ Check
+                <i class="bi bi-check2-circle"></i> Check
             </button>
         </div>
-        <p class="verify-input-hint">New tickets: 6 chars (e.g. <strong>ABX4K9</strong>) · Old tickets: XXXX-XXXX-XXXX</p>
+        <p class="verify-input-hint">New tickets: 6 chars (e.g. <strong>ABX4K9</strong>) &nbsp;·&nbsp; Old tickets: XXXX-XXXX-XXXX</p>
     </div>
 
     <!-- ── Result Panel ── -->
     <div class="verify-result-panel" id="result-panel" style="display:none">
         <div class="verify-result-inner" id="result-inner"></div>
         <button class="verify-next-btn" id="next-btn" onclick="clearResult()">
-            ✓ Next Person
+            <i class="bi bi-arrow-right-circle-fill"></i> Next Person
         </button>
     </div>
 
@@ -62,27 +78,25 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- jsQR — QR decoder, works in all mobile browsers -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <script>
-// ── State ──────────────────────────────────────────────────────
 let scanning    = false;
 let scanStream  = null;
 let scanTimer   = null;
 let resultTimer = null;
 
-const video      = document.getElementById('qr-video');
-const toggleBtn  = document.getElementById('toggle-scanner-btn');
-const codeInput  = document.getElementById('code-input');
-const panel      = document.getElementById('result-panel');
+const video       = document.getElementById('qr-video');
+const toggleBtn   = document.getElementById('toggle-scanner-btn');
+const idleOverlay = document.getElementById('scanner-idle');
+const httpsNote   = document.getElementById('scanner-https-note');
+const codeInput   = document.getElementById('code-input');
+const panel       = document.getElementById('result-panel');
 const resultInner = document.getElementById('result-inner');
 
 // ── Submit via API ─────────────────────────────────────────────
 async function submitCode(rawCode) {
     const code = rawCode || codeInput.value.trim();
     if (!code) return;
-
-    // Debounce rapid scans
     if (panel.dataset.busy === '1') return;
     panel.dataset.busy = '1';
 
@@ -104,48 +118,45 @@ async function submitCode(rawCode) {
 // ── Render Result ──────────────────────────────────────────────
 function showResult(status, booking) {
     clearTimeout(resultTimer);
-
     let html = '';
     if (status === 'loading') {
-        html = `<div class="vr-loading">Checking…</div>`;
+        html = `<div class="vr-loading"><i class="bi bi-arrow-repeat"></i> Checking…</div>`;
         panel.className = 'verify-result-panel vr-panel-neutral';
     } else if (status === 'success') {
         html = `
-            <div class="vr-icon vr-icon-ok">✓</div>
+            <div class="vr-icon vr-icon-ok"><i class="bi bi-patch-check-fill"></i></div>
             <p class="vr-label">ENTRY GRANTED</p>
             <p class="vr-name">${esc(booking.customer_name)}</p>
             <div class="vr-details">
-                <div class="vr-chip">💺 ${esc(booking.seats)}</div>
-                <div class="vr-chip">📞 ${esc(booking.customer_phone)}</div>
-                <div class="vr-chip">🎤 ${esc(booking.event_title)}</div>
+                <div class="vr-chip"><i class="bi bi-grid-1x2-fill"></i> ${esc(booking.seats)}</div>
+                <div class="vr-chip"><i class="bi bi-telephone-fill"></i> ${esc(booking.customer_phone)}</div>
+                <div class="vr-chip"><i class="bi bi-calendar-event-fill"></i> ${esc(booking.event_title)}</div>
             </div>`;
         panel.className = 'verify-result-panel vr-panel-ok';
-        // Vibrate once (android support)
         if (navigator.vibrate) navigator.vibrate(120);
-        // Auto-clear after 3s
         resultTimer = setTimeout(clearResult, 3000);
     } else if (status === 'already') {
         html = `
-            <div class="vr-icon vr-icon-warn">⚠</div>
+            <div class="vr-icon vr-icon-warn"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <p class="vr-label">ALREADY SCANNED</p>
             <p class="vr-name">${esc(booking.customer_name)}</p>
             <div class="vr-details">
-                <div class="vr-chip">💺 ${esc(booking.seats)}</div>
-                <div class="vr-chip">📞 ${esc(booking.customer_phone)}</div>
+                <div class="vr-chip"><i class="bi bi-grid-1x2-fill"></i> ${esc(booking.seats)}</div>
+                <div class="vr-chip"><i class="bi bi-telephone-fill"></i> ${esc(booking.customer_phone)}</div>
             </div>`;
         panel.className = 'verify-result-panel vr-panel-warn';
         if (navigator.vibrate) navigator.vibrate([80,60,80]);
         resultTimer = setTimeout(clearResult, 4000);
     } else if (status === 'invalid') {
         html = `
-            <div class="vr-icon vr-icon-bad">✗</div>
+            <div class="vr-icon vr-icon-bad"><i class="bi bi-x-circle-fill"></i></div>
             <p class="vr-label">INVALID TICKET</p>
             <p class="vr-name" style="font-size:14px;color:var(--text-muted)">Code not found in your events</p>`;
         panel.className = 'verify-result-panel vr-panel-bad';
         if (navigator.vibrate) navigator.vibrate([100,50,100,50,200]);
         resultTimer = setTimeout(clearResult, 3000);
     } else {
-        html = `<div class="vr-icon vr-icon-bad">!</div><p class="vr-label">Connection Error</p>`;
+        html = `<div class="vr-icon vr-icon-bad"><i class="bi bi-wifi-off"></i></div><p class="vr-label">Connection Error</p>`;
         panel.className = 'verify-result-panel vr-panel-bad';
         resultTimer = setTimeout(clearResult, 3000);
     }
@@ -168,16 +179,13 @@ function esc(str) {
         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Manual input: submit on Enter ─────────────────────────────
+// ── Manual input ───────────────────────────────────────────────
 codeInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); submitCode(); }
 });
-
-// Auto-uppercase + strip dashes for new format
 codeInput.addEventListener('input', function() {
     const val = this.value.replace(/[^A-Za-z0-9\-]/g,'').toUpperCase();
     this.value = val;
-    // Auto-submit when 6 chars entered (no dashes) or 14 (old format)
     const clean = val.replace(/-/g,'');
     if (clean.length === 6 || clean.length === 12) {
         setTimeout(() => submitCode(), 80);
@@ -190,6 +198,11 @@ toggleBtn.addEventListener('click', () => {
 });
 
 async function startScanner() {
+    // Check for secure context (HTTPS or localhost)
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+        httpsNote.style.display = 'flex';
+        return;
+    }
     try {
         scanStream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -197,11 +210,18 @@ async function startScanner() {
         video.srcObject = scanStream;
         video.play();
         scanning = true;
-        toggleBtn.textContent = '⏹ Stop Camera';
+        idleOverlay.style.display = 'none';
+        toggleBtn.innerHTML = '<i class="bi bi-stop-circle-fill"></i> Stop Camera';
         document.getElementById('scanner-laser').style.display = 'block';
         scanLoop();
     } catch(e) {
-        alert('Camera not available: ' + e.message);
+        if (e.name === 'NotAllowedError') {
+            httpsNote.style.display = 'flex';
+            httpsNote.querySelector('i').className = 'bi bi-camera-video-off-fill';
+            httpsNote.innerHTML = '<i class="bi bi-camera-video-off-fill"></i> Camera permission denied. Allow camera access in browser settings.';
+        } else {
+            httpsNote.style.display = 'flex';
+        }
     }
 }
 
@@ -211,7 +231,8 @@ function stopScanner() {
     video.srcObject = null;
     scanning = false;
     clearTimeout(scanTimer);
-    toggleBtn.textContent = '📷 Start Camera Scanner';
+    idleOverlay.style.display = 'flex';
+    toggleBtn.innerHTML = '<i class="bi bi-camera-fill"></i> Start Camera';
     document.getElementById('scanner-laser').style.display = 'none';
 }
 
@@ -227,16 +248,14 @@ function scanLoop() {
             inversionAttempts: 'dontInvert'
         });
         if (qr && qr.data && panel.dataset.busy !== '1') {
-            // Extract code from QR data format: SHOWRUNNER|CODE|name|seats  OR raw code
             let raw = qr.data;
             if (raw.includes('|')) raw = raw.split('|')[1];
             submitCode(raw.trim());
         }
     }
-    scanTimer = setTimeout(scanLoop, 250); // 4 fps — fast enough, saves CPU
+    scanTimer = setTimeout(scanLoop, 250);
 }
 
-// Init
 panel.dataset.busy = '0';
 codeInput.focus();
 </script>
