@@ -33,7 +33,8 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "showrunner-dev-secret-change-in-prod")
 DATABASE      = os.path.join(os.path.dirname(__file__), "showrunner.db")
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "static", "uploads")
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_EXTENSIONS       = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v"}
 
 
 # ─── Database ────────────────────────────────────────────────
@@ -142,6 +143,16 @@ def init_db():
             FOREIGN KEY (event_id) REFERENCES events(id)
         );
 
+        CREATE TABLE IF NOT EXISTS event_videos (
+            id TEXT PRIMARY KEY,
+            event_id TEXT NOT NULL,
+            filename TEXT,
+            embed_url TEXT,
+            title TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (event_id) REFERENCES events(id)
+        );
+
         CREATE TABLE IF NOT EXISTS bookings (
             id TEXT PRIMARY KEY,
             event_id TEXT NOT NULL,
@@ -178,6 +189,7 @@ init_db()
 # ── Live DB migrations ────────────────────────────────────────
 for _col, _sql in [
     ("row_names",    "ALTER TABLE venues ADD COLUMN row_names TEXT"),
+    ("event_videos", "CREATE TABLE IF NOT EXISTS event_videos (id TEXT PRIMARY KEY, event_id TEXT NOT NULL, filename TEXT, embed_url TEXT, title TEXT, created_at TEXT NOT NULL)"),
     ("tagline",      "ALTER TABLE organizers ADD COLUMN tagline TEXT"),
     ("logo",         "ALTER TABLE organizers ADD COLUMN logo TEXT"),
     ("brand_color",  "ALTER TABLE organizers ADD COLUMN brand_color TEXT DEFAULT '#f5c842'"),
@@ -191,7 +203,7 @@ for _col, _sql in [
     except Exception:
         pass  # column already exists
 
-for sub in ("venues", "events", "performers", "logos"):
+for sub in ("venues", "events", "performers", "logos", "clips"):
     os.makedirs(os.path.join(UPLOAD_FOLDER, sub), exist_ok=True)
 
 
@@ -448,6 +460,40 @@ def calc_seat_total(seats, tiers, base_price):
 
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def allowed_video(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_VIDEO_EXTENSIONS
+
+def save_video(file):
+    if not file or not file.filename or not allowed_video(file.filename):
+        return None
+    ext      = file.filename.rsplit(".", 1)[1].lower()
+    filename = f"{uuid.uuid4().hex[:16]}.{ext}"
+    folder   = os.path.join(UPLOAD_FOLDER, "clips")
+    os.makedirs(folder, exist_ok=True)
+    file.save(os.path.join(folder, filename))
+    return f"uploads/clips/{filename}"
+
+def extract_embed_url(raw):
+    """Normalise YouTube / TikTok / Instagram links to embeddable URLs."""
+    import re
+    raw = raw.strip()
+    # YouTube: watch?v=ID or youtu.be/ID  →  /embed/ID
+    yt = re.search(r'(?:youtube\.com/watch\?v=|youtu\.be/)([\w\-]{11})', raw)
+    if yt:
+        return f"https://www.youtube.com/embed/{yt.group(1)}?autoplay=0&rel=0"
+    # TikTok: /video/ID
+    tt = re.search(r'tiktok\.com/.+/video/(\d+)', raw)
+    if tt:
+        return f"https://www.tiktok.com/embed/v2/{tt.group(1)}"
+    # Instagram reel: /reel/CODE/
+    ig = re.search(r'instagram\.com/(?:reel|p)/([\w\-]+)', raw)
+    if ig:
+        return f"https://www.instagram.com/p/{ig.group(1)}/embed"
+    # Raw embed URL — pass through if it looks like a URL
+    if raw.startswith("http"):
+        return raw
+    return None
 
 
 def save_upload(file, subfolder):
