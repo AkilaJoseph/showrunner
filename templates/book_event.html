@@ -1,31 +1,94 @@
 {% extends "base.html" %}
-{% block title %}Book — {{ event.title }} — ShowRunner{% endblock %}
+{% block title %}{{ event.title }} — ShowRunner{% endblock %}
+
+{# ── Open Graph / WhatsApp link preview ── #}
+{% block head_extra %}
+{% set cover_url = url_for('static', filename=event_photos[0].filename, _external=True) if event_photos else '' %}
+<meta property="og:type"        content="website">
+<meta property="og:title"       content="{{ event.title }}">
+<meta property="og:description" content="{{ event.event_date|fmtdate }} · {{ event.event_time|fmttime }} · {{ event.venue_name }}{% if event.organizer_name %} · by {{ event.organizer_name }}{% endif %}">
+{% if cover_url %}<meta property="og:image" content="{{ cover_url }}">{% endif %}
+<meta property="og:url"         content="{{ request.url }}">
+<meta name="twitter:card"       content="summary_large_image">
+{% endblock %}
+
 {% block content %}
+{% set brand = event.org_brand_color or '#f5c842' %}
+
 <a href="{{ url_for('book_list') }}" class="btn-back">← Back to Events</a>
 
-<!-- Hero -->
-<div class="card" style="background:linear-gradient(135deg,#13132a,#1a1238,#13132a);border-color:#2a2a50;margin-bottom:22px">
-    <h2 style="font-family:var(--font-display);font-size:38px;letter-spacing:1px;color:#fff;line-height:1.1">{{ event.title }}</h2>
-    <p style="font-size:13px;color:var(--text-secondary);margin-top:6px">
-        {{ event.event_date|fmtdate }} &nbsp;·&nbsp; {{ event.event_time|fmttime }} &nbsp;·&nbsp; {{ event.venue_name }}
-    </p>
-    {% if event.organizer_name %}
-    <p style="font-size:11px;color:var(--text-muted);margin-top:3px">Presented by {{ event.organizer_name }}</p>
+<!-- ── Hero ── -->
+<div class="card event-hero-card" style="
+    background:linear-gradient(135deg,#13132a,#1a1238,#13132a);
+    border-color:{{ brand }}44;
+    border-top:3px solid {{ brand }};
+    margin-bottom:22px;
+    position:relative;overflow:hidden;
+">
+    {# Cover photo if exists #}
+    {% if event_photos %}
+    <div class="event-hero-cover" style="background-image:url('{{ url_for('static', filename=event_photos[0].filename) }}')"></div>
+    <div class="event-hero-cover-dim"></div>
     {% endif %}
-    {% if tiers %}
-    <p style="font-family:var(--font-display);font-size:22px;color:var(--accent-gold);margin-top:14px;letter-spacing:0.5px">
-        from {{ "{:,.0f}".format(tiers|map(attribute='price')|min) }}
-        <span style="font-size:13px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
-    </p>
-    {% else %}
-    <p style="font-family:var(--font-display);font-size:28px;color:var(--accent-gold);margin-top:14px;letter-spacing:1px">
-        {{ "{:,.0f}".format(event.price) }}
-        <span style="font-size:14px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
-    </p>
-    {% endif %}
+
+    <div style="position:relative;z-index:1">
+        <!-- Organizer brand badge -->
+        {% if event.organizer_name %}
+        <div class="org-brand-badge" style="border-color:{{ brand }}44">
+            {% if event.org_logo %}
+            <img src="{{ url_for('static', filename=event.org_logo) }}" alt="{{ event.organizer_name }}" class="org-brand-logo">
+            {% endif %}
+            <div>
+                <span class="org-brand-name" style="color:{{ brand }}">{{ event.organizer_name }}</span>
+                {% if event.org_tagline %}<span class="org-brand-tagline">{{ event.org_tagline }}</span>{% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <h2 style="font-family:var(--font-display);font-size:38px;letter-spacing:1px;color:#fff;line-height:1.1;margin-top:12px">{{ event.title }}</h2>
+        <p style="font-size:13px;color:var(--text-secondary);margin-top:6px">
+            📅 {{ event.event_date|fmtdate }} &nbsp;·&nbsp; 🕐 {{ event.event_time|fmttime }} &nbsp;·&nbsp; 📍 {{ event.venue_name }}
+        </p>
+
+        {% if tiers %}
+        <p style="font-family:var(--font-display);font-size:24px;color:{{ brand }};margin-top:14px;letter-spacing:0.5px">
+            from {{ "{:,.0f}".format(tiers|map(attribute='price')|min) }}
+            <span style="font-size:13px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
+        </p>
+        {% else %}
+        <p style="font-family:var(--font-display);font-size:28px;color:{{ brand }};margin-top:14px;letter-spacing:1px">
+            {{ "{:,.0f}".format(event.price) }}
+            <span style="font-size:14px;font-family:var(--font-body);color:var(--text-secondary)">TZS / seat</span>
+        </p>
+        {% endif %}
+
+        <!-- Share row -->
+        <div class="event-share-row">
+            <button class="event-share-btn" onclick="copyEventLink(this)" title="Copy link">
+                🔗 Copy Link
+            </button>
+            <a class="event-share-btn event-share-wa" id="wa-share-btn" href="#" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                Share on WhatsApp
+            </a>
+            {% if event.org_phone %}
+            <a class="event-share-btn" href="https://wa.me/{{ event.org_phone|replace('+','') |replace(' ','') |replace('-','') }}" target="_blank" rel="noopener" title="Contact organizer">
+                📞 Contact Organizer
+            </a>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
-<!-- Performers -->
+<!-- ── Description ── -->
+{% if event.description %}
+<div class="card" style="margin-bottom:22px">
+    <p class="section-title">About This Show</p>
+    <p style="font-size:14px;color:var(--text-secondary);line-height:1.8">{{ event.description|nl2br }}</p>
+</div>
+{% endif %}
+
+<!-- ── Performers ── -->
 {% if performers %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🎭 Tonight's Lineup</p>
@@ -48,8 +111,8 @@
 </div>
 {% endif %}
 
-<!-- Event Gallery -->
-{% if event_photos %}
+<!-- ── Event Gallery ── -->
+{% if event_photos|length > 1 %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">📸 From Previous Shows</p>
     <div class="photo-grid photo-grid-public">
@@ -63,14 +126,14 @@
 </div>
 {% endif %}
 
-<!-- Seat Map -->
+<!-- ── Seat Map ── -->
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🪑 Select Your Seats</p>
     <div class="seat-map-container" id="seat-map"></div>
     <div id="selection-info" class="selection-info" style="display:none"></div>
 </div>
 
-<!-- Venue Photos -->
+<!-- ── Venue Photos ── -->
 {% if venue_photos %}
 <div class="card" style="margin-bottom:22px">
     <p class="section-title">🏟️ The Venue — {{ event.venue_name }}</p>
@@ -85,7 +148,17 @@
 </div>
 {% endif %}
 
-<!-- Booking Form -->
+<!-- ── Payment Instructions ── -->
+{% if event.payment_info %}
+<div class="card" style="margin-bottom:22px;border-color:{{ brand }}44">
+    <p class="section-title">💳 How to Pay</p>
+    <div class="payment-info-box" style="border-left-color:{{ brand }}">
+        {{ event.payment_info|nl2br }}
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Booking Form ── -->
 <form method="POST" class="form-card" id="booking-form">
     <p class="section-title">Your Details</p>
     <input type="hidden" name="selected_seats" id="selected_seats" value="">
@@ -109,7 +182,8 @@
                    placeholder="john@email.com">
         </div>
     </div>
-    <button type="submit" id="book-submit-btn" class="btn btn-primary btn-full" disabled>
+    <button type="submit" id="book-submit-btn" class="btn btn-primary btn-full" disabled
+            style="background:{{ brand }};border-color:{{ brand }};color:#111120">
         Select seats to book
     </button>
 </form>
@@ -127,11 +201,35 @@ buildSeatMap("seat-map", {
     price:       {{ event.price }},
     tiers:       eventTiers,
 });
+
 document.getElementById("booking-form").addEventListener("submit", function(e) {
     if (!document.getElementById("selected_seats").value) {
         e.preventDefault();
         alert("Please select at least one seat.");
     }
 });
+
+// WhatsApp share
+(function() {
+    const title   = {{ event.title|tojson }};
+    const date    = {{ (event.event_date|fmtdate)|tojson }};
+    const time    = {{ (event.event_time|fmttime)|tojson }};
+    const venue   = {{ event.venue_name|tojson }};
+    const url     = window.location.href;
+    const msg     = `🎤 *${title}*\n📅 ${date} · 🕐 ${time}\n📍 ${venue}\n\nGrab your ticket 👇\n${url}`;
+    document.getElementById('wa-share-btn').href =
+        'https://wa.me/?text=' + encodeURIComponent(msg);
+})();
+
+// Copy link
+function copyEventLink(btn) {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = orig, 2000);
+    }).catch(() => {
+        prompt('Copy this link:', window.location.href);
+    });
+}
 </script>
 {% endblock %}

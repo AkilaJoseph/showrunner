@@ -10,7 +10,25 @@
 </div>
 {% endif %}
 
-<form method="POST" class="form-card">
+<form method="POST" enctype="multipart/form-data" class="form-card">
+
+    <!-- Cover Photo -->
+    <div class="field">
+        <label>Cover Photo <span style="color:var(--text-muted);font-weight:400;font-size:11px">— shown on the events listing page</span></label>
+        <div class="upload-zone" id="cover-zone">
+            <div class="upload-zone-inner" onclick="document.getElementById('cover-input').click()">
+                <div class="upload-icon">🖼️</div>
+                <p class="upload-label">Click to choose a cover photo</p>
+                <p class="upload-hint">Wide (landscape) images work best — PNG, JPG, WEBP</p>
+                <input type="file" id="cover-input" name="cover_photo" accept="image/*"
+                       style="display:none" onchange="previewCover(this)">
+            </div>
+        </div>
+        <div id="cover-preview-wrap" style="display:none;margin-top:10px">
+            <img id="cover-preview-img" style="width:100%;max-height:180px;object-fit:cover;border-radius:10px;border:1px solid var(--border)">
+        </div>
+    </div>
+
     <div class="field">
         <label for="title">Event Title *</label>
         <input type="text" id="title" name="title" placeholder="e.g. Comedy Night Live" required>
@@ -18,7 +36,8 @@
 
     <div class="field">
         <label for="description">Description</label>
-        <textarea id="description" name="description" placeholder="Tell people about this show..."></textarea>
+        <textarea id="description" name="description" style="min-height:90px"
+                  placeholder="Tell people what's in store — performers, vibe, dress code, age limit…"></textarea>
     </div>
 
     <div class="form-row">
@@ -43,11 +62,38 @@
             </select>
         </div>
         <div class="field">
-            <label for="price">Ticket Price (TZS) *</label>
+            <label for="price">Base Ticket Price (TZS) *</label>
             <input type="number" id="price" name="price" placeholder="e.g. 15000" min="0" step="500" required>
+            <span class="field-hint">You can set per-row tier prices after creating the event</span>
         </div>
     </div>
 
-    <button type="submit" class="btn btn-primary btn-full" {% if not venues %}disabled{% endif %}>Create Event</button>
+    <!-- Payment Info -->
+    <div class="field">
+        <label for="payment_info">Payment Instructions <span style="color:var(--text-muted);font-weight:400;font-size:11px">— optional</span></label>
+        <textarea id="payment_info" name="payment_info" style="min-height:70px"
+                  placeholder="e.g. Lipa Namba: 123456 (Vodacom M-Pesa) | Tigo: 0715-000-000 — Save receipt, shown at entry"></textarea>
+        <span class="field-hint">Shown on the booking page so customers know how to pay</span>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-full" {% if not venues %}disabled{% endif %}>
+        Create Event
+    </button>
 </form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewCover(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            document.getElementById('cover-preview-img').src = e.target.result;
+            document.getElementById('cover-preview-wrap').style.display = 'block';
+        };
+        reader.readAsDataURL(input.files[0]);
+        document.querySelector('#cover-zone .upload-label').textContent = input.files[0].name;
+    }
+}
+</script>
 {% endblock %}

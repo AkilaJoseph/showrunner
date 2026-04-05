@@ -21,6 +21,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head_extra %}{% endblock %}
 </head>
 <body>
 
@@ -78,6 +79,10 @@
             <a href="{{ url_for('org_bookings_list') }}"
                class="sidebar-nav-item {% if request.endpoint == 'org_bookings_list' %}active{% endif %}">
                 <span class="sidebar-nav-icon">◈</span> Bookings
+            </a>
+            <a href="{{ url_for('org_profile') }}"
+               class="sidebar-nav-item {% if request.endpoint == 'org_profile' %}active{% endif %}">
+                <span class="sidebar-nav-icon">🎨</span> Brand Profile
             </a>
             <div class="sidebar-divider"></div>
             <a href="{{ url_for('org_verify_ticket') }}"

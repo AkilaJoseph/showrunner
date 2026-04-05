@@ -1663,6 +1663,157 @@ a { color: inherit; text-decoration: none; }
 
 
 /* ══════════════════════════════════════════════
+   ORGANIZER BRANDING — event hero
+══════════════════════════════════════════════ */
+.event-hero-card { position: relative; overflow: hidden; }
+
+.event-hero-cover {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.18;
+    filter: blur(2px);
+    z-index: 0;
+}
+.event-hero-cover-dim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(13,13,26,0.3) 0%, rgba(13,13,26,0.85) 100%);
+    z-index: 0;
+}
+
+.org-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px 7px 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 30px;
+}
+.org-brand-logo {
+    height: 28px;
+    width: 28px;
+    object-fit: contain;
+    border-radius: 6px;
+}
+.org-brand-name {
+    font-family: var(--font-display);
+    font-size: 15px;
+    letter-spacing: 0.5px;
+}
+.org-brand-tagline {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+}
+
+/* Share row */
+.event-share-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+}
+.event-share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color 0.15s, background 0.15s;
+    white-space: nowrap;
+}
+.event-share-btn:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); }
+.event-share-wa { color: #25d366; border-color: rgba(37,211,102,0.3); }
+.event-share-wa:hover { background: rgba(37,211,102,0.1); border-color: #25d366; }
+
+/* Payment info block */
+.payment-info-box {
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent-gold);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+}
+
+/* field hint */
+.field-hint {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+
+/* ── Ticket — org bar + actions ── */
+.ticket-org-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border-radius: 16px 16px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    flex-wrap: wrap;
+}
+.ticket-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+}
+.ticket-action-btn {
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+    transition: border-color 0.15s;
+}
+.ticket-action-btn:hover { border-color: var(--accent-gold); color: var(--text-primary); }
+.ticket-action-wa { color: #25d366; border-color: rgba(37,211,102,0.3); }
+.ticket-action-wa:hover { background: rgba(37,211,102,0.08); border-color: #25d366; }
+
+@media print {
+    .ticket-actions, .ticket-hint, .btn-back, .pub-header,
+    .pwa-install-banner, .toast-container { display: none !important; }
+    .ticket-wrapper { margin: 0; }
+    body { background: #fff; }
+}
+
+@media (max-width: 600px) {
+    .event-share-row { gap: 6px; }
+    .event-share-btn { font-size: 11px; padding: 6px 10px; }
+    .org-brand-badge { flex-wrap: wrap; }
+    .ticket-actions { flex-direction: column; }
+    .ticket-action-btn { min-width: 0; }
+}
+
+
+/* ══════════════════════════════════════════════
    SEAT MAP — horizontal scroll on narrow screens
 ══════════════════════════════════════════════ */
 @media (max-width: 600px) {
