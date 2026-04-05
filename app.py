@@ -838,20 +838,26 @@ def org_delete_performer(event_id, performer_id):
 @app.route("/org/events/<event_id>/photos/add", methods=["POST"])
 @require_organizer
 def org_add_event_photo(event_id):
-    org_id   = session["organizer_id"]
-    conn     = get_db()
+    org_id = session["organizer_id"]
+    conn   = get_db()
     if not conn.execute("SELECT id FROM events WHERE id=? AND organizer_id=?", (event_id, org_id)).fetchone():
         conn.close(); flash("Event not found.", "error")
         return redirect(url_for("org_events_list"))
-    filename = save_upload(request.files.get("photo"), "events")
-    if not filename:
-        conn.close(); flash("Invalid file. Use PNG, JPG, GIF or WEBP.", "error")
+    caption   = request.form.get("caption", "").strip()
+    files     = request.files.getlist("photo")
+    saved     = 0
+    for f in files:
+        filename = save_upload(f, "events")
+        if filename:
+            conn.execute(
+                "INSERT INTO event_photos (id,event_id,filename,caption,created_at) VALUES(?,?,?,?,?)",
+                (new_id(), event_id, filename, caption, datetime.now().isoformat()))
+            saved += 1
+    if saved == 0:
+        conn.close(); flash("Invalid file(s). Use PNG, JPG, GIF or WEBP.", "error")
         return redirect(url_for("org_event_detail", event_id=event_id))
-    conn.execute(
-        "INSERT INTO event_photos (id,event_id,filename,caption,created_at) VALUES(?,?,?,?,?)",
-        (new_id(), event_id, filename, request.form.get("caption","").strip(), datetime.now().isoformat()))
     conn.commit(); conn.close()
-    flash("Photo added!", "success")
+    flash(f"{saved} photo{'s' if saved > 1 else ''} added!", "success")
     return redirect(url_for("org_event_detail", event_id=event_id))
 
 
@@ -1031,17 +1037,24 @@ def org_add_event_video(event_id):
         conn.close(); flash("Event not found.", "error")
         return redirect(url_for("org_events_list"))
 
-    title     = request.form.get("title", "").strip()
-    file_path = save_video(request.files.get("clip"))
-    raw_link  = request.form.get("embed_link", "").strip()
-    embed_url = None
+    title    = request.form.get("title", "").strip()
+    raw_link = request.form.get("embed_link", "").strip()
+    clips    = request.files.getlist("clip")
+    saved    = 0
 
-    if file_path:
-        conn.execute(
-            "INSERT INTO event_videos (id,event_id,filename,embed_url,title,created_at) VALUES(?,?,?,?,?,?)",
-            (new_id(), event_id, file_path, None, title, datetime.now().isoformat()))
+    if clips and any(f.filename for f in clips):
+        for f in clips:
+            file_path = save_video(f)
+            if file_path:
+                conn.execute(
+                    "INSERT INTO event_videos (id,event_id,filename,embed_url,title,created_at) VALUES(?,?,?,?,?,?)",
+                    (new_id(), event_id, file_path, None, title, datetime.now().isoformat()))
+                saved += 1
+        if saved == 0:
+            conn.close(); flash("Invalid video file(s). Use MP4, WEBM or MOV.", "error")
+            return redirect(url_for("org_event_detail", event_id=event_id))
         conn.commit(); conn.close()
-        flash("Video clip added!", "success")
+        flash(f"{saved} clip{'s' if saved > 1 else ''} added!", "success")
     elif raw_link:
         embed_url = extract_embed_url(raw_link)
         if not embed_url:

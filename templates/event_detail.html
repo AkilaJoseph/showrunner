@@ -194,17 +194,20 @@
     <form method="POST" action="{{ url_for('org_add_event_photo', event_id=event.id) }}"
           enctype="multipart/form-data" class="upload-zone" id="event-upload-zone">
         <div class="upload-zone-inner" onclick="document.getElementById('event-photo-input').click()">
-            <div class="upload-icon">🖼️</div>
-            <p class="upload-label">Click to choose a photo</p>
-            <p class="upload-hint">PNG, JPG, GIF or WEBP</p>
+            <div class="upload-icon"><i class="bi bi-images" style="font-size:28px"></i></div>
+            <p class="upload-label">Click to choose photos</p>
+            <p class="upload-hint">Select multiple — PNG, JPG, GIF or WEBP</p>
             <input type="file" id="event-photo-input" name="photo" accept="image/*"
-                   style="display:none" onchange="previewLabel(this,'event-upload-zone')">
+                   multiple style="display:none" onchange="previewMultiLabel(this,'event-upload-zone')">
         </div>
+        <div id="event-photo-preview" class="multi-upload-preview" style="display:none"></div>
         <div class="field" style="margin-top:12px;margin-bottom:0">
             <label>Caption (optional)</label>
             <input type="text" name="caption" placeholder="e.g. The crowd going wild at Mikumi 2024">
         </div>
-        <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px">Upload Photo</button>
+        <button type="submit" class="btn btn-primary btn-full" style="margin-top:10px">
+            <i class="bi bi-cloud-arrow-up-fill" style="margin-right:5px"></i>Upload Photos
+        </button>
     </form>
 </div>
 
@@ -254,14 +257,21 @@
             </div>
 
             <div class="video-add-tabs" id="video-add-tabs">
-                <button type="button" class="video-tab active" data-tab="upload" onclick="switchVideoTab('upload',this)">📁 Upload Clip</button>
-                <button type="button" class="video-tab" data-tab="link" onclick="switchVideoTab('link',this)">🔗 Paste Link</button>
+                <button type="button" class="video-tab active" data-tab="upload" onclick="switchVideoTab('upload',this)">
+                    <i class="bi bi-folder-fill" style="margin-right:4px"></i>Upload Clips
+                </button>
+                <button type="button" class="video-tab" data-tab="link" onclick="switchVideoTab('link',this)">
+                    <i class="bi bi-link-45deg" style="margin-right:4px"></i>Paste Link
+                </button>
             </div>
 
             <div id="video-tab-upload" class="video-tab-panel">
                 <div class="field" style="margin-top:10px">
-                    <label>Video File <span style="color:var(--text-muted);font-weight:400;font-size:11px">MP4, WEBM, MOV (max 50 MB recommended)</span></label>
-                    <input type="file" name="clip" accept="video/mp4,video/webm,video/quicktime,.mov,.m4v" class="file-input-plain">
+                    <label>Video Files <span style="color:var(--text-muted);font-weight:400;font-size:11px">Select multiple — MP4, WEBM, MOV (max 50 MB each)</span></label>
+                    <input type="file" name="clip" accept="video/mp4,video/webm,video/quicktime,.mov,.m4v"
+                           multiple class="file-input-plain" id="video-clip-input"
+                           onchange="previewVideoList(this)">
+                    <div id="video-file-list" class="multi-upload-preview" style="display:none;margin-top:8px"></div>
                 </div>
             </div>
 
@@ -329,6 +339,38 @@ document.querySelectorAll('.color-preset-label').forEach(label => {
 function previewLabel(input, zoneId) {
     if (input.files && input.files[0])
         document.querySelector('#'+zoneId+' .upload-label').textContent = input.files[0].name;
+}
+
+// Multi-photo preview thumbnails
+function previewMultiLabel(input, zoneId) {
+    const files = [...input.files];
+    if (!files.length) return;
+    const label = document.querySelector('#'+zoneId+' .upload-label');
+    label.textContent = files.length === 1 ? files[0].name : `${files.length} photos selected`;
+    const preview = document.getElementById('event-photo-preview');
+    preview.innerHTML = '';
+    preview.style.display = 'flex';
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.className = 'multi-preview-thumb';
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// Multi-video file list
+function previewVideoList(input) {
+    const files = [...input.files];
+    const list  = document.getElementById('video-file-list');
+    if (!files.length) { list.style.display = 'none'; return; }
+    list.style.display = 'flex';
+    list.innerHTML = files.map(f =>
+        `<span class="multi-file-chip"><i class="bi bi-camera-video-fill"></i> ${f.name}</span>`
+    ).join('');
 }
 
 function switchVideoTab(tab, btn) {

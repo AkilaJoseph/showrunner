@@ -1315,6 +1315,37 @@ a { color: inherit; text-decoration: none; }
     transition: border-color 0.2s;
 }
 .upload-zone:hover { border-color: var(--accent-gold); }
+
+/* Multi-upload preview thumbnails */
+.multi-upload-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+.multi-preview-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+/* File chips for video list */
+.multi-file-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
 .upload-zone-inner {
     text-align: center;
     padding: 18px 12px;
@@ -2742,6 +2773,23 @@ a { color: inherit; text-decoration: none; }
 }
 .tk-embed-iframe { width: 100%; height: 100%; border: none; }
 
+/* Pause/play icon flash */
+.tk-pause-icon {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 64px;
+    color: rgba(255,255,255,0.85);
+    background: rgba(0,0,0,0.35);
+    border-radius: 50%;
+    width: 90px; height: 90px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 6;
+    transition: opacity 0.18s;
+}
+
 /* Mute button */
 .tk-mute-btn {
     position: absolute;
@@ -2988,10 +3036,15 @@ a { color: inherit; text-decoration: none; }
     background: rgba(0,0,0,0.28);
     font-size: 36px;
     color: #fff;
-    transition: background 0.15s, transform 0.15s;
+    transition: background 0.2s, opacity 0.2s;
     pointer-events: none;
     flex-direction: column;
     gap: 4px;
+}
+/* Hide play overlay while video is playing (JS adds .playing class) */
+.pub-video-item.playing .pub-video-play-btn {
+    opacity: 0;
+    background: transparent;
 }
 .pub-video-play-btn::after {
     content: 'Tap to watch';
@@ -3002,8 +3055,9 @@ a { color: inherit; text-decoration: none; }
     font-family: sans-serif;
     font-weight: 600;
 }
-.pub-video-item:hover .pub-video-play-btn { background: rgba(0,0,0,0.48); }
+.pub-video-item:hover .pub-video-play-btn { background: rgba(0,0,0,0.42); }
 .pub-video-item:hover .pub-video-play-btn::after { opacity: 0.8; }
+.pub-video-item.playing:hover .pub-video-play-btn { opacity: 0; }
 .pub-video-label {
     padding: 6px 10px 8px;
     font-size: 11px;

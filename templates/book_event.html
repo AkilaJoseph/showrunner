@@ -209,8 +209,10 @@
                        playsinline loop muted
                        preload="metadata">
                 </video>
-                <!-- Tap to mute/unmute -->
-                <div class="tk-mute-btn" title="Tap to unmute"><i class="bi bi-volume-mute-fill"></i></div>
+                <!-- Pause/play indicator (shown briefly on tap) -->
+                <div class="tk-pause-icon"><i class="bi bi-pause-fill"></i></div>
+                <!-- Mute/unmute -->
+                <div class="tk-mute-btn" title="Toggle sound"><i class="bi bi-volume-mute-fill"></i></div>
                 {% else %}
                 <div class="tk-embed-wrap">
                     <iframe src="{{ v.embed_url }}"
@@ -415,6 +417,50 @@ function copyEventLink(btn) {
     });
 }
 
+// ── Preview strip: auto-play on hover + IntersectionObserver ──
+(function() {
+    const strip = document.getElementById('video-preview-strip');
+    if (!strip) return;
+
+    // Auto-play when card enters viewport (first visible card), pause on scroll out
+    const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            const vid = entry.target.querySelector('.pub-video-player');
+            if (!vid) return;
+            if (entry.isIntersecting) {
+                vid.muted = true;
+                vid.play().catch(() => {});
+            } else {
+                vid.pause();
+            }
+        });
+    }, { threshold: 0.6 });
+
+    strip.querySelectorAll('.pub-video-item').forEach(item => {
+        observer.observe(item);
+        const vid = item.querySelector('.pub-video-player');
+        if (!vid) return;
+
+        function startPlay() {
+            vid.muted = true;
+            vid.play().catch(() => {});
+            item.classList.add('playing');
+        }
+        function stopPlay() {
+            vid.pause();
+            item.classList.remove('playing');
+        }
+
+        // Hover play (desktop)
+        item.addEventListener('mouseenter', startPlay);
+        item.addEventListener('mouseleave', stopPlay);
+
+        // Track play/pause state for the class
+        vid.addEventListener('play',  () => item.classList.add('playing'));
+        vid.addEventListener('pause', () => item.classList.remove('playing'));
+    });
+})();
+
 // ── TikTok Reel ───────────────────────────────────────────────
 (function() {
     const overlay   = document.getElementById('tk-reel');
@@ -500,10 +546,16 @@ function copyEventLink(btn) {
             vid.muted = muted;
             vid.play().catch(() => {});
             updateProgress(slide, vid);
+            updatePlayPauseIcon(slide, false);
         }
         // Update Book link to close reel
         const bookBtns = slide.querySelectorAll('.tk-book-btn');
         bookBtns.forEach(b => b.addEventListener('click', closeReel));
+    }
+
+    function updatePlayPauseIcon(slide, paused) {
+        const icon = slide.querySelector('.tk-pause-icon');
+        if (icon) icon.style.opacity = paused ? '1' : '0';
     }
 
     function pauseSlide(idx) {
@@ -513,26 +565,39 @@ function copyEventLink(btn) {
         if (vid) vid.pause();
     }
 
-    // Mute/unmute tap
+    // Tap video = pause/play; tap mute btn = toggle sound
     slides.forEach(slide => {
         const vid     = slide.querySelector('.tk-video');
         const muteBtn = slide.querySelector('.tk-mute-btn');
-        if (!vid || !muteBtn) return;
+        if (!vid) return;
+
         function updateMuteIcon() {
+            if (!muteBtn) return;
             muteBtn.innerHTML = vid.muted
                 ? '<i class="bi bi-volume-mute-fill"></i>'
                 : '<i class="bi bi-volume-up-fill"></i>';
         }
+
+        // Tap video to pause/resume
         vid.addEventListener('click', () => {
-            muted = !muted;
-            slides.forEach(s => { const v = s.querySelector('.tk-video'); if(v) v.muted = muted; });
-            updateMuteIcon();
+            if (vid.paused) {
+                vid.play().catch(() => {});
+                updatePlayPauseIcon(slide, false);
+            } else {
+                vid.pause();
+                updatePlayPauseIcon(slide, true);
+            }
         });
-        muteBtn.addEventListener('click', () => {
-            muted = !muted;
-            slides.forEach(s => { const v = s.querySelector('.tk-video'); if(v) v.muted = muted; });
-            updateMuteIcon();
-        });
+
+        // Mute button toggles sound only
+        if (muteBtn) {
+            muteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                muted = !muted;
+                slides.forEach(s => { const v = s.querySelector('.tk-video'); if(v) v.muted = muted; });
+                updateMuteIcon();
+            });
+        }
     });
 
     // Progress bar
