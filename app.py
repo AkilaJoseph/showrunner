@@ -358,8 +358,10 @@ def new_id():
 
 
 def generate_ticket_code():
-    chars = string.ascii_uppercase.replace("I", "").replace("O", "") + "23456789"
-    return "-".join("".join(random.choices(chars, k=4)) for _ in range(3))
+    # 6-char code from unambiguous alphabet — fast to read aloud, easy to type.
+    # 32^6 = 1B+ combinations, zero collision risk for any real event size.
+    chars = string.ascii_uppercase.replace("I","").replace("O","") + "23456789"
+    return "".join(random.choices(chars, k=6))
 
 
 def generate_qr_base64(data_str):
@@ -984,32 +986,62 @@ def org_bookings_list():
     return render_template("bookings.html", bookings=bookings)
 
 
+def _lookup_booking(raw_code, org_id):
+    """Find and mark a booking verified. Returns (status, booking_dict|None).
+    Handles both new 6-char codes and legacy XXXX-XXXX-XXXX codes."""
+    conn  = get_db()
+    clean = raw_code.upper().replace(" ","").replace("-","")
+    # Match against both stored formats: exact match on code or stripped code
+    booking = conn.execute("""
+        SELECT b.*, e.title as event_title, e.event_date, e.event_time, v.name as venue_name
+        FROM bookings b JOIN events e ON b.event_id=e.id
+        LEFT JOIN venues v ON e.venue_id=v.id
+        WHERE (b.code=? OR REPLACE(b.code,'-','')=?) AND e.organizer_id=?
+    """, (clean, clean, org_id)).fetchone()
+    if not booking:
+        conn.close()
+        return "invalid", None
+    already = booking["verified"] == 1
+    if not already:
+        conn.execute("UPDATE bookings SET verified=1, verified_at=? WHERE id=?",
+                     (datetime.now().isoformat(), booking["id"]))
+        conn.commit()
+    conn.close()
+    return ("already" if already else "success"), dict(booking)
+
+
 @app.route("/org/verify", methods=["GET", "POST"])
 @require_organizer
 def org_verify_ticket():
     org_id = session["organizer_id"]
     result = None; code_input = ""
     if request.method == "POST":
-        code_input = request.form.get("code","").strip().upper().replace(" ","")
-        clean      = code_input.replace("-","")
-        conn       = get_db()
-        booking    = conn.execute("""
-            SELECT b.*, e.title as event_title, e.event_date, e.event_time, v.name as venue_name
-            FROM bookings b JOIN events e ON b.event_id=e.id
-            LEFT JOIN venues v ON e.venue_id=v.id
-            WHERE REPLACE(b.code,'-','')=? AND e.organizer_id=?
-        """, (clean, org_id)).fetchone()
-        if booking:
-            already = booking["verified"] == 1
-            if not already:
-                conn.execute("UPDATE bookings SET verified=1, verified_at=? WHERE id=?",
-                             (datetime.now().isoformat(), booking["id"]))
-                conn.commit()
-            result = {"status": "already" if already else "success", "booking": dict(booking)}
-        else:
-            result = {"status": "invalid"}
-        conn.close()
+        code_input = request.form.get("code","").strip()
+        status, booking = _lookup_booking(code_input, org_id)
+        result = {"status": status, "booking": booking}
     return render_template("verify.html", result=result, code_input=code_input)
+
+
+@app.route("/api/verify", methods=["POST"])
+@require_organizer
+def api_verify():
+    org_id = session["organizer_id"]
+    data   = request.get_json(force=True)
+    raw    = data.get("code","").strip()
+    if not raw:
+        return jsonify({"status": "invalid"})
+    status, booking = _lookup_booking(raw, org_id)
+    resp = {"status": status}
+    if booking:
+        resp["booking"] = {
+            "customer_name":  booking["customer_name"],
+            "customer_phone": booking["customer_phone"],
+            "seats":          booking["seats"],
+            "event_title":    booking["event_title"],
+            "event_date":     format_date(booking["event_date"]),
+            "event_time":     format_time(booking["event_time"]),
+        }
+    return jsonify(resp)
 
 
 # ═══════════════════════════════════════════════════════════════

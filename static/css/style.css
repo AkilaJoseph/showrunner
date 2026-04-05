@@ -1663,6 +1663,247 @@ a { color: inherit; text-decoration: none; }
 
 
 /* ══════════════════════════════════════════════
+   VERIFY PAGE — fast entrance scanning
+══════════════════════════════════════════════ */
+.verify-page {
+    max-width: 520px;
+    margin: 0 auto;
+}
+.verify-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+.verify-heading {
+    font-family: var(--font-display);
+    font-size: 30px;
+    letter-spacing: 1px;
+    color: #fff;
+    margin-bottom: 4px;
+}
+.verify-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* Scanner card */
+.verify-scanner-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.scanner-viewport {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    background: #000;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scanner-viewport video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.scanner-frame {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+/* Corner brackets */
+.scanner-corner {
+    position: absolute;
+    width: 28px; height: 28px;
+    border-color: var(--accent-gold);
+    border-style: solid;
+}
+.scanner-corner.tl { top:16px;left:16px;  border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
+.scanner-corner.tr { top:16px;right:16px; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
+.scanner-corner.bl { bottom:16px;left:16px;  border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
+.scanner-corner.br { bottom:16px;right:16px; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
+/* Scanning laser line */
+.scanner-laser {
+    position: absolute;
+    left: 16px; right: 16px;
+    height: 2px;
+    background: var(--accent-gold);
+    box-shadow: 0 0 8px 2px rgba(245,200,66,0.6);
+    display: none;
+    animation: scanLine 1.8s ease-in-out infinite;
+}
+@keyframes scanLine {
+    0%   { top: 16px; }
+    50%  { top: calc(100% - 18px); }
+    100% { top: 16px; }
+}
+.scanner-hint {
+    position: absolute;
+    bottom: 10px;
+    left: 0; right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+}
+
+/* OR divider */
+.verify-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+.verify-or::before, .verify-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+/* Manual input card */
+.verify-manual-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.verify-input-wrap {
+    display: flex;
+    gap: 8px;
+}
+.verify-code-input {
+    flex: 1;
+    font-family: var(--font-mono);
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    text-align: center;
+    padding: 14px 10px;
+    background: var(--bg-input);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    color: #fff;
+    outline: none;
+    text-transform: uppercase;
+    min-width: 0;
+    transition: border-color 0.15s;
+}
+.verify-code-input:focus { border-color: var(--accent-gold); }
+.verify-submit-btn {
+    flex-shrink: 0;
+    padding: 14px 22px;
+    background: var(--accent-gold);
+    color: #111120;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+}
+.verify-submit-btn:hover { opacity: 0.88; }
+.verify-input-hint {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Result panel */
+.verify-result-panel {
+    border-radius: var(--radius);
+    padding: 24px 20px 16px;
+    text-align: center;
+    animation: popIn 0.18s ease;
+    margin-bottom: 16px;
+}
+@keyframes popIn {
+    from { transform: scale(0.94); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+.vr-panel-ok   { background: rgba(62,207,150,0.12); border: 2px solid #3ecf96; }
+.vr-panel-warn { background: rgba(245,200,66,0.10); border: 2px solid var(--accent-gold); }
+.vr-panel-bad  { background: rgba(255,80,80,0.10);  border: 2px solid #ff5050; }
+.vr-panel-neutral { background: var(--bg-tertiary); border: 1px solid var(--border); }
+
+.vr-icon {
+    font-size: 56px;
+    line-height: 1;
+    margin-bottom: 6px;
+}
+.vr-icon-ok   { color: #3ecf96; }
+.vr-icon-warn { color: var(--accent-gold); }
+.vr-icon-bad  { color: #ff5050; }
+
+.vr-label {
+    font-family: var(--font-display);
+    font-size: 24px;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+}
+.vr-name {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 12px;
+}
+.vr-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 4px;
+}
+.vr-chip {
+    padding: 5px 12px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.vr-loading {
+    font-size: 18px;
+    color: var(--text-muted);
+    padding: 12px 0;
+    animation: pulse 0.8s ease infinite alternate;
+}
+@keyframes pulse { from { opacity:0.4 } to { opacity:1 } }
+
+.verify-next-btn {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 10px 30px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: var(--font-body);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.verify-next-btn:hover { background: rgba(255,255,255,0.14); }
+
+@media (max-width: 480px) {
+    .verify-code-input  { font-size: 22px; letter-spacing: 3px; padding: 12px 6px; }
+    .verify-submit-btn  { padding: 12px 14px; font-size: 16px; }
+    .vr-icon            { font-size: 44px; }
+    .vr-label           { font-size: 20px; }
+    .vr-name            { font-size: 17px; }
+}
+
+
+/* ══════════════════════════════════════════════
    ORGANIZER BRANDING — event hero
 ══════════════════════════════════════════════ */
 .event-hero-card { position: relative; overflow: hidden; }

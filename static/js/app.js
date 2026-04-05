@@ -232,14 +232,21 @@ function buildSeatMap(containerId, options) {
 
 
 // ── Verify Input Auto-Format ──────────────────────────────────
+// Handles new 6-char codes (XXXXXX) and legacy 12-char codes (XXXX-XXXX-XXXX)
 function formatVerifyInput(input) {
-    let val       = input.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-    let formatted = "";
-    for (let i = 0; i < val.length && i < 12; i++) {
-        if (i > 0 && i % 4 === 0) formatted += "-";
-        formatted += val[i];
+    const val = input.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (val.length <= 6) {
+        // New format — no dashes, plain 6 chars
+        input.value = val;
+    } else {
+        // Legacy format — add dashes every 4 chars
+        let formatted = "";
+        for (let i = 0; i < val.length && i < 12; i++) {
+            if (i > 0 && i % 4 === 0) formatted += "-";
+            formatted += val[i];
+        }
+        input.value = formatted;
     }
-    input.value = formatted;
 }
 
 

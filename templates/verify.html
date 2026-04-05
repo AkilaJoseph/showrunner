@@ -1,60 +1,243 @@
 {% extends "base.html" %}
 {% block title %}Verify Ticket — ShowRunner{% endblock %}
 {% block content %}
-<h2 class="page-title">Verify Ticket</h2>
-<p class="page-subtitle">Enter the ticket code shown by the guest to verify their booking.</p>
 
-<div class="form-card" style="max-width:500px;margin:0 auto">
-    <form method="POST" action="{{ url_for('org_verify_ticket') }}">
-        <div class="field">
-            <label for="code">Ticket Code</label>
-            <input type="text" id="code" name="code" class="verify-input"
-                   placeholder="ABCD-EFGH-JKLM" maxlength="14"
-                   value="{{ code_input or '' }}"
-                   oninput="formatVerifyInput(this)"
-                   autocomplete="off" autofocus>
-        </div>
-        <button type="submit" class="btn btn-primary btn-full">Verify Ticket</button>
-    </form>
+<div class="verify-page">
 
-    {% if result %}
-    <div class="verify-result
-        {% if result.status == 'success' %}verify-success
-        {% elif result.status == 'already' %}verify-already
-        {% else %}verify-invalid{% endif %}">
-
-        {% if result.status == 'invalid' %}
-            <div class="verify-icon">✗</div>
-            <p class="verify-title">Invalid Ticket</p>
-            <p class="verify-message">This code doesn't match any booking for your events.</p>
-
-        {% elif result.status == 'already' %}
-            <div class="verify-icon">⚠</div>
-            <p class="verify-title">Already Verified</p>
-            <p class="verify-message">This ticket was already used for entry.</p>
-
-            <div class="verify-details">
-                <div><span class="label">Name:</span> <strong>{{ result.booking.customer_name }}</strong></div>
-                <div><span class="label">Phone:</span> <strong>{{ result.booking.customer_phone }}</strong></div>
-                <div><span class="label">Event:</span> <strong>{{ result.booking.event_title }}</strong></div>
-                <div><span class="label">Seats:</span> <strong style="color:var(--accent-gold)">{{ result.booking.seats }}</strong></div>
-            </div>
-
-        {% else %}
-            <div class="verify-icon">✓</div>
-            <p class="verify-title">Ticket Valid!</p>
-            <p class="verify-message">Entry granted. Welcome!</p>
-
-            <div class="verify-details">
-                <div><span class="label">Name:</span> <strong>{{ result.booking.customer_name }}</strong></div>
-                <div><span class="label">Phone:</span> <strong>{{ result.booking.customer_phone }}</strong></div>
-                <div><span class="label">Event:</span> <strong>{{ result.booking.event_title }}</strong></div>
-                <div><span class="label">Seats:</span> <strong style="color:var(--accent-gold)">{{ result.booking.seats }}</strong></div>
-                <div><span class="label">Date:</span> <strong>{{ result.booking.event_date|fmtdate }}</strong></div>
-                <div><span class="label">Time:</span> <strong>{{ result.booking.event_time|fmttime }}</strong></div>
-            </div>
-        {% endif %}
+    <!-- Header -->
+    <div class="verify-header">
+        <h2 class="verify-heading">🎫 Ticket Verification</h2>
+        <p class="verify-sub">Scan QR code or type the 6-character code</p>
     </div>
-    {% endif %}
+
+    <!-- ── QR Scanner ── -->
+    <div class="verify-scanner-card" id="scanner-card">
+        <div class="scanner-viewport" id="scanner-viewport">
+            <video id="qr-video" playsinline muted></video>
+            <div class="scanner-frame">
+                <div class="scanner-corner tl"></div>
+                <div class="scanner-corner tr"></div>
+                <div class="scanner-corner bl"></div>
+                <div class="scanner-corner br"></div>
+                <div class="scanner-laser" id="scanner-laser"></div>
+            </div>
+            <p class="scanner-hint">Point camera at the QR code on the ticket</p>
+        </div>
+        <button class="btn btn-secondary btn-full" id="toggle-scanner-btn" style="margin-top:12px">
+            📷 Start Camera Scanner
+        </button>
+    </div>
+
+    <!-- ── Divider ── -->
+    <div class="verify-or"><span>or type code manually</span></div>
+
+    <!-- ── Manual Input ── -->
+    <div class="verify-manual-card">
+        <div class="verify-input-wrap">
+            <input type="text" id="code-input" class="verify-code-input"
+                   placeholder="e.g. ABX4K9"
+                   maxlength="14"
+                   autocomplete="off"
+                   autocorrect="off"
+                   autocapitalize="characters"
+                   spellcheck="false"
+                   inputmode="text"
+                   autofocus>
+            <button class="verify-submit-btn" id="verify-btn" onclick="submitCode()">
+                ✓ Check
+            </button>
+        </div>
+        <p class="verify-input-hint">New tickets: 6 chars (e.g. <strong>ABX4K9</strong>) · Old tickets: XXXX-XXXX-XXXX</p>
+    </div>
+
+    <!-- ── Result Panel ── -->
+    <div class="verify-result-panel" id="result-panel" style="display:none">
+        <div class="verify-result-inner" id="result-inner"></div>
+        <button class="verify-next-btn" id="next-btn" onclick="clearResult()">
+            ✓ Next Person
+        </button>
+    </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- jsQR — QR decoder, works in all mobile browsers -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+// ── State ──────────────────────────────────────────────────────
+let scanning    = false;
+let scanStream  = null;
+let scanTimer   = null;
+let resultTimer = null;
+
+const video      = document.getElementById('qr-video');
+const toggleBtn  = document.getElementById('toggle-scanner-btn');
+const codeInput  = document.getElementById('code-input');
+const panel      = document.getElementById('result-panel');
+const resultInner = document.getElementById('result-inner');
+
+// ── Submit via API ─────────────────────────────────────────────
+async function submitCode(rawCode) {
+    const code = rawCode || codeInput.value.trim();
+    if (!code) return;
+
+    // Debounce rapid scans
+    if (panel.dataset.busy === '1') return;
+    panel.dataset.busy = '1';
+
+    showResult('loading', null);
+
+    try {
+        const resp = await fetch('/api/verify', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ code }),
+        });
+        const data = await resp.json();
+        showResult(data.status, data.booking || null);
+    } catch(e) {
+        showResult('error', null);
+    }
+}
+
+// ── Render Result ──────────────────────────────────────────────
+function showResult(status, booking) {
+    clearTimeout(resultTimer);
+
+    let html = '';
+    if (status === 'loading') {
+        html = `<div class="vr-loading">Checking…</div>`;
+        panel.className = 'verify-result-panel vr-panel-neutral';
+    } else if (status === 'success') {
+        html = `
+            <div class="vr-icon vr-icon-ok">✓</div>
+            <p class="vr-label">ENTRY GRANTED</p>
+            <p class="vr-name">${esc(booking.customer_name)}</p>
+            <div class="vr-details">
+                <div class="vr-chip">💺 ${esc(booking.seats)}</div>
+                <div class="vr-chip">📞 ${esc(booking.customer_phone)}</div>
+                <div class="vr-chip">🎤 ${esc(booking.event_title)}</div>
+            </div>`;
+        panel.className = 'verify-result-panel vr-panel-ok';
+        // Vibrate once (android support)
+        if (navigator.vibrate) navigator.vibrate(120);
+        // Auto-clear after 3s
+        resultTimer = setTimeout(clearResult, 3000);
+    } else if (status === 'already') {
+        html = `
+            <div class="vr-icon vr-icon-warn">⚠</div>
+            <p class="vr-label">ALREADY SCANNED</p>
+            <p class="vr-name">${esc(booking.customer_name)}</p>
+            <div class="vr-details">
+                <div class="vr-chip">💺 ${esc(booking.seats)}</div>
+                <div class="vr-chip">📞 ${esc(booking.customer_phone)}</div>
+            </div>`;
+        panel.className = 'verify-result-panel vr-panel-warn';
+        if (navigator.vibrate) navigator.vibrate([80,60,80]);
+        resultTimer = setTimeout(clearResult, 4000);
+    } else if (status === 'invalid') {
+        html = `
+            <div class="vr-icon vr-icon-bad">✗</div>
+            <p class="vr-label">INVALID TICKET</p>
+            <p class="vr-name" style="font-size:14px;color:var(--text-muted)">Code not found in your events</p>`;
+        panel.className = 'verify-result-panel vr-panel-bad';
+        if (navigator.vibrate) navigator.vibrate([100,50,100,50,200]);
+        resultTimer = setTimeout(clearResult, 3000);
+    } else {
+        html = `<div class="vr-icon vr-icon-bad">!</div><p class="vr-label">Connection Error</p>`;
+        panel.className = 'verify-result-panel vr-panel-bad';
+        resultTimer = setTimeout(clearResult, 3000);
+    }
+
+    resultInner.innerHTML = html;
+    panel.style.display = 'block';
+}
+
+function clearResult() {
+    clearTimeout(resultTimer);
+    panel.style.display = 'none';
+    panel.dataset.busy = '0';
+    codeInput.value = '';
+    codeInput.focus();
+}
+
+function esc(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Manual input: submit on Enter ─────────────────────────────
+codeInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); submitCode(); }
+});
+
+// Auto-uppercase + strip dashes for new format
+codeInput.addEventListener('input', function() {
+    const val = this.value.replace(/[^A-Za-z0-9\-]/g,'').toUpperCase();
+    this.value = val;
+    // Auto-submit when 6 chars entered (no dashes) or 14 (old format)
+    const clean = val.replace(/-/g,'');
+    if (clean.length === 6 || clean.length === 12) {
+        setTimeout(() => submitCode(), 80);
+    }
+});
+
+// ── QR Camera Scanner ──────────────────────────────────────────
+toggleBtn.addEventListener('click', () => {
+    if (scanning) stopScanner(); else startScanner();
+});
+
+async function startScanner() {
+    try {
+        scanStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
+        video.srcObject = scanStream;
+        video.play();
+        scanning = true;
+        toggleBtn.textContent = '⏹ Stop Camera';
+        document.getElementById('scanner-laser').style.display = 'block';
+        scanLoop();
+    } catch(e) {
+        alert('Camera not available: ' + e.message);
+    }
+}
+
+function stopScanner() {
+    if (scanStream) scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+    video.srcObject = null;
+    scanning = false;
+    clearTimeout(scanTimer);
+    toggleBtn.textContent = '📷 Start Camera Scanner';
+    document.getElementById('scanner-laser').style.display = 'none';
+}
+
+function scanLoop() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        const canvas = document.createElement('canvas');
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const imageData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        const qr = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+        });
+        if (qr && qr.data && panel.dataset.busy !== '1') {
+            // Extract code from QR data format: SHOWRUNNER|CODE|name|seats  OR raw code
+            let raw = qr.data;
+            if (raw.includes('|')) raw = raw.split('|')[1];
+            submitCode(raw.trim());
+        }
+    }
+    scanTimer = setTimeout(scanLoop, 250); // 4 fps — fast enough, saves CPU
+}
+
+// Init
+panel.dataset.busy = '0';
+codeInput.focus();
+</script>
 {% endblock %}
