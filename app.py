@@ -197,6 +197,7 @@ for _col, _sql in [
     ("website",      "ALTER TABLE organizers ADD COLUMN website TEXT"),
     ("cover_photo",  "ALTER TABLE events ADD COLUMN cover_photo TEXT"),
     ("payment_info", "ALTER TABLE events ADD COLUMN payment_info TEXT"),
+    ("video_likes",  "CREATE TABLE IF NOT EXISTS video_likes (id TEXT PRIMARY KEY, video_id TEXT NOT NULL, fingerprint TEXT NOT NULL, created_at TEXT NOT NULL, UNIQUE(video_id, fingerprint))"),
 ]:
     try:
         _c = get_db(); _c.execute(_sql); _c.commit(); _c.close()
@@ -1305,6 +1306,12 @@ def book_event(event_id):
     event_videos = conn.execute("SELECT * FROM event_videos WHERE event_id=? ORDER BY created_at DESC", (event_id,)).fetchall()
     venue_photos = conn.execute("SELECT * FROM venue_photos WHERE venue_id=? ORDER BY created_at DESC",
                                 (event["venue_db_id"],)).fetchall() if event["venue_db_id"] else []
+    fp = session.get("visitor_id", "")
+    video_likes_data = {}
+    for v in event_videos:
+        count = conn.execute("SELECT COUNT(*) FROM video_likes WHERE video_id=?", (v["id"],)).fetchone()[0]
+        liked = bool(conn.execute("SELECT 1 FROM video_likes WHERE video_id=? AND fingerprint=?", (v["id"], fp)).fetchone()) if fp else False
+        video_likes_data[v["id"]] = {"count": count, "liked": liked}
 
     if request.method == "POST":
         seats_str = request.form.get("selected_seats","")
@@ -1335,7 +1342,8 @@ def book_event(event_id):
     return render_template("book_event.html", event=event, booked_seats=booked_seats,
                            tiers=tiers, performers=performers,
                            event_photos=event_photos, event_videos=event_videos,
-                           venue_photos=venue_photos, row_config=row_config)
+                           venue_photos=venue_photos, row_config=row_config,
+                           video_likes_data=video_likes_data)
 
 
 @app.route("/ticket/<booking_id>")
@@ -1438,6 +1446,44 @@ def api_event_tiers(event_id):
     tiers = [dict(r) for r in conn.execute("SELECT * FROM seat_tiers WHERE event_id=? ORDER BY row_from", (event_id,)).fetchall()]
     conn.close()
     return jsonify(tiers)
+
+
+@app.route("/api/video/<video_id>/like", methods=["POST"])
+def api_video_like(video_id):
+    """Toggle like on a video. Fingerprint = session uid (no login required)."""
+    if "visitor_id" not in session:
+        session["visitor_id"] = str(uuid.uuid4())
+    fp   = session["visitor_id"]
+    conn = get_db()
+    existing = conn.execute(
+        "SELECT id FROM video_likes WHERE video_id=? AND fingerprint=?", (video_id, fp)
+    ).fetchone()
+    if existing:
+        conn.execute("DELETE FROM video_likes WHERE video_id=? AND fingerprint=?", (video_id, fp))
+        liked = False
+    else:
+        conn.execute(
+            "INSERT INTO video_likes (id,video_id,fingerprint,created_at) VALUES(?,?,?,?)",
+            (new_id(), video_id, fp, datetime.now().isoformat())
+        )
+        liked = True
+    conn.commit()
+    count = conn.execute("SELECT COUNT(*) FROM video_likes WHERE video_id=?", (video_id,)).fetchone()[0]
+    conn.close()
+    return jsonify({"liked": liked, "count": count})
+
+
+@app.route("/api/video/<video_id>/likes")
+def api_video_likes(video_id):
+    """Return like count + whether current visitor has liked."""
+    fp   = session.get("visitor_id", "")
+    conn = get_db()
+    count = conn.execute("SELECT COUNT(*) FROM video_likes WHERE video_id=?", (video_id,)).fetchone()[0]
+    liked = bool(conn.execute(
+        "SELECT 1 FROM video_likes WHERE video_id=? AND fingerprint=?", (video_id, fp)
+    ).fetchone()) if fp else False
+    conn.close()
+    return jsonify({"liked": liked, "count": count})
 
 
 # ─── Run ─────────────────────────────────────────────────────

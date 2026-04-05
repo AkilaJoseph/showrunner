@@ -438,27 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Videos: .pub-video-item — open in lightbox instead of inline play
-        document.querySelectorAll('.pub-video-reel').forEach(reel => {
-            const vidItems = [...reel.querySelectorAll('.pub-video-item')];
-            const lbItems = vidItems.map(item => {
-                const vid = item.querySelector('.pub-video-player');
-                const fr  = item.querySelector('.pub-video-iframe');
-                const lbl = item.querySelector('.pub-video-label');
-                if (vid) return { type: 'video',  src: vid.src,  caption: lbl ? lbl.textContent : '' };
-                if (fr)  return { type: 'embed',  src: fr.src,   caption: lbl ? lbl.textContent : '' };
-                return null;
-            }).filter(Boolean);
-
-            vidItems.forEach((item, i) => {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    // Pause the inline player if it was playing
-                    const vid = item.querySelector('.pub-video-player');
-                    if (vid) vid.pause();
-                    LB.open(lbItems, i);
-                });
-            });
-        });
+        // Video reel items — handled by TikTok reel in book_event.html (opens tk-reel)
+        // Lightbox handles photos only.
     });
 })();

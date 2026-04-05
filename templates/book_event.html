@@ -148,33 +148,163 @@
 
 <!-- ── Video Highlights ── -->
 {% if event_videos %}
-<div class="card" style="margin-bottom:22px;padding:20px 20px 16px">
-    <p class="section-title" style="margin-bottom:16px"><i class="bi bi-camera-video-fill" style="color:var(--accent-red);margin-right:6px"></i>Highlights</p>
-    <div class="pub-video-reel" id="video-reel">
+<div class="card highlights-card" style="margin-bottom:22px;padding:0;overflow:hidden">
+    <div class="highlights-header">
+        <span><i class="bi bi-camera-video-fill" style="color:var(--accent-red);margin-right:6px"></i>Highlights</span>
+        <button class="highlights-open-btn" id="open-reel-btn">
+            <i class="bi bi-play-circle-fill"></i> Watch
+        </button>
+    </div>
+    <!-- Preview strip -->
+    <div class="pub-video-reel" id="video-preview-strip">
         {% for v in event_videos %}
-        <div class="pub-video-item" data-src="{{ url_for('static', filename=v.filename) if v.filename else '' }}">
+        {% set vld = video_likes_data.get(v.id, {}) %}
+        <div class="pub-video-item" data-index="{{ loop.index0 }}"
+             data-video-id="{{ v.id }}"
+             data-src="{{ url_for('static', filename=v.filename) if v.filename else '' }}"
+             data-embed="{{ v.embed_url or '' }}"
+             data-title="{{ v.title or '' }}"
+             data-liked="{{ 'true' if vld.get('liked') else 'false' }}"
+             data-likes="{{ vld.get('count', 0) }}">
             {% if v.filename %}
             <video class="pub-video-player"
                    src="{{ url_for('static', filename=v.filename) }}"
-                   muted playsinline preload="metadata"
-                   loop
-                   poster="">
+                   muted playsinline preload="metadata" loop poster="">
             </video>
-            <div class="pub-video-play-btn"><i class="bi bi-play-circle-fill"></i></div>
             {% else %}
-            <div class="pub-video-embed-wrap">
-                <iframe src="{{ v.embed_url }}"
-                        frameborder="0" allowfullscreen
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        loading="lazy"
-                        class="pub-video-iframe"></iframe>
-            </div>
+            <div class="pub-video-thumb-embed"><i class="bi bi-play-circle" style="font-size:36px;color:#fff"></i></div>
             {% endif %}
-            {% if v.title %}
-            <p class="pub-video-label">{{ v.title }}</p>
-            {% endif %}
+            <div class="pub-video-play-btn"><i class="bi bi-play-circle-fill"></i></div>
+            {% if v.title %}<p class="pub-video-label">{{ v.title }}</p>{% endif %}
         </div>
         {% endfor %}
+    </div>
+</div>
+
+<!-- ── TikTok-style fullscreen reel ── -->
+<div class="tk-reel-overlay" id="tk-reel" style="display:none">
+    <!-- Top bar -->
+    <div class="tk-top-bar">
+        <button class="tk-close-btn" id="tk-close"><i class="bi bi-x-lg"></i></button>
+        <span class="tk-top-title">Highlights · {{ event.title }}</span>
+        <a class="tk-get-tickets-btn" href="#booking-form" id="tk-ticket-link"
+           style="background:{{ brand }};color:#111120">
+            <i class="bi bi-ticket-perforated-fill"></i> Get Tickets
+        </a>
+    </div>
+
+    <!-- Vertical snap scroll container -->
+    <div class="tk-feed" id="tk-feed">
+        {% for v in event_videos %}
+        {% set vld = video_likes_data.get(v.id, {}) %}
+        <div class="tk-slide" data-video-id="{{ v.id }}"
+             data-liked="{{ 'true' if vld.get('liked') else 'false' }}"
+             data-likes="{{ vld.get('count', 0) }}">
+
+            <!-- Media -->
+            <div class="tk-media">
+                {% if v.filename %}
+                <video class="tk-video"
+                       src="{{ url_for('static', filename=v.filename) }}"
+                       playsinline loop muted
+                       preload="metadata">
+                </video>
+                <!-- Tap to mute/unmute -->
+                <div class="tk-mute-btn" title="Tap to unmute"><i class="bi bi-volume-mute-fill"></i></div>
+                {% else %}
+                <div class="tk-embed-wrap">
+                    <iframe src="{{ v.embed_url }}"
+                            frameborder="0" allowfullscreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            class="tk-embed-iframe"></iframe>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right sidebar actions -->
+            <div class="tk-actions">
+                <!-- Organizer avatar -->
+                <div class="tk-action-group">
+                    <div class="tk-avatar">
+                        {% if event.org_logo %}
+                        <img src="{{ url_for('static', filename=event.org_logo) }}" alt="">
+                        {% else %}
+                        <i class="bi bi-music-note-beamed"></i>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Like -->
+                <div class="tk-action-group">
+                    <button class="tk-action-btn tk-like-btn {% if vld.get('liked') %}liked{% endif %}"
+                            data-video-id="{{ v.id }}">
+                        <i class="bi bi-heart{% if vld.get('liked') %}-fill{% endif %}"></i>
+                    </button>
+                    <span class="tk-action-count tk-like-count">{{ vld.get('count', 0)|int }}</span>
+                </div>
+
+                <!-- Share -->
+                <div class="tk-action-group">
+                    <button class="tk-action-btn" onclick="tkShare()">
+                        <i class="bi bi-share-fill"></i>
+                    </button>
+                    <span class="tk-action-count">Share</span>
+                </div>
+
+                <!-- WhatsApp -->
+                <div class="tk-action-group">
+                    <a class="tk-action-btn" id="tk-wa-btn-{{ loop.index0 }}" href="#" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    </a>
+                    <span class="tk-action-count">WhatsApp</span>
+                </div>
+
+                <!-- Book tickets -->
+                <div class="tk-action-group">
+                    <a class="tk-action-btn tk-book-btn" href="#booking-form"
+                       style="background:{{ brand }}22;border-color:{{ brand }}">
+                        <i class="bi bi-ticket-perforated-fill" style="color:{{ brand }}"></i>
+                    </a>
+                    <span class="tk-action-count">Book</span>
+                </div>
+            </div>
+
+            <!-- Bottom info overlay -->
+            <div class="tk-bottom-info">
+                <div class="tk-organizer-follow">
+                    <span class="tk-organizer-name">@{{ event.organizer_name or 'ShowRunner' }}</span>
+                    {% if event.org_phone %}
+                    <a class="tk-follow-btn"
+                       href="https://wa.me/{{ event.org_phone|replace('+','')|replace(' ','')|replace('-','') }}"
+                       target="_blank" rel="noopener">
+                        <i class="bi bi-whatsapp"></i> Follow
+                    </a>
+                    {% elif event.org_website %}
+                    <a class="tk-follow-btn" href="{{ event.org_website }}" target="_blank" rel="noopener">
+                        <i class="bi bi-person-plus-fill"></i> Follow
+                    </a>
+                    {% endif %}
+                </div>
+                {% if v.title %}
+                <p class="tk-video-caption">{{ v.title }}</p>
+                {% endif %}
+                <p class="tk-event-tag">
+                    <i class="bi bi-music-note-beamed"></i> {{ event.title }} ·
+                    <i class="bi bi-calendar3"></i> {{ event.event_date|fmtdate }}
+                </p>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="tk-progress-wrap" style="display:none">
+                <div class="tk-progress-bar"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Scroll hint -->
+    <div class="tk-scroll-hint" id="tk-scroll-hint">
+        <i class="bi bi-chevron-up"></i><span>Swipe up</span>
     </div>
 </div>
 {% endif %}
@@ -284,5 +414,195 @@ function copyEventLink(btn) {
         prompt('Copy this link:', window.location.href);
     });
 }
+
+// ── TikTok Reel ───────────────────────────────────────────────
+(function() {
+    const overlay   = document.getElementById('tk-reel');
+    const feed      = document.getElementById('tk-feed');
+    const closeBtn  = document.getElementById('tk-close');
+    const openBtn   = document.getElementById('open-reel-btn');
+    const scrollHint = document.getElementById('tk-scroll-hint');
+    if (!overlay || !feed) return;
+
+    const slides = [...feed.querySelectorAll('.tk-slide')];
+    let current  = 0;
+    let muted    = true;
+
+    // WhatsApp links for each slide
+    slides.forEach((slide, i) => {
+        const waBtn = slide.querySelector(`#tk-wa-btn-${i}`);
+        if (waBtn) {
+            const title = {{ event.title|tojson }};
+            const date  = {{ (event.event_date|fmtdate)|tojson }};
+            const url   = window.location.href;
+            const msg   = `🎬 Check out this clip from *${title}*!\n📅 ${date}\n👇 Book a seat:\n${url}`;
+            waBtn.href = 'https://wa.me/?text=' + encodeURIComponent(msg);
+        }
+    });
+
+    // Open reel
+    function openReel(startIndex) {
+        current = startIndex || 0;
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        scrollToSlide(current, false);
+        playSlide(current);
+        // Hide scroll hint after first swipe
+        if (scrollHint) setTimeout(() => scrollHint.style.opacity = '0', 2000);
+    }
+
+    function closeReel() {
+        overlay.style.display = 'none';
+        document.body.style.overflow = '';
+        slides.forEach(s => {
+            const v = s.querySelector('.tk-video');
+            if (v) { v.pause(); v.muted = true; }
+        });
+        muted = true;
+    }
+
+    if (openBtn) openBtn.addEventListener('click', () => openReel(0));
+    if (closeBtn) closeBtn.addEventListener('click', closeReel);
+
+    // Also open from preview strip
+    document.querySelectorAll('.pub-video-item[data-index]').forEach(item => {
+        item.addEventListener('click', () => openReel(parseInt(item.dataset.index) || 0));
+    });
+
+    // Close ticket link — close reel first
+    const tkTicketLink = document.getElementById('tk-ticket-link');
+    if (tkTicketLink) tkTicketLink.addEventListener('click', closeReel);
+
+    // Scroll snap — track which slide is visible
+    let scrolling = false;
+    feed.addEventListener('scroll', () => {
+        if (scrolling) return;
+        const slideH = feed.clientHeight;
+        const idx = Math.round(feed.scrollTop / slideH);
+        if (idx !== current) {
+            pauseSlide(current);
+            current = idx;
+            playSlide(current);
+        }
+    }, { passive: true });
+
+    function scrollToSlide(idx, smooth = true) {
+        scrolling = true;
+        feed.scrollTo({ top: idx * feed.clientHeight, behavior: smooth ? 'smooth' : 'instant' });
+        setTimeout(() => scrolling = false, 500);
+    }
+
+    function playSlide(idx) {
+        const slide = slides[idx];
+        if (!slide) return;
+        const vid = slide.querySelector('.tk-video');
+        if (vid) {
+            vid.muted = muted;
+            vid.play().catch(() => {});
+            updateProgress(slide, vid);
+        }
+        // Update Book link to close reel
+        const bookBtns = slide.querySelectorAll('.tk-book-btn');
+        bookBtns.forEach(b => b.addEventListener('click', closeReel));
+    }
+
+    function pauseSlide(idx) {
+        const slide = slides[idx];
+        if (!slide) return;
+        const vid = slide.querySelector('.tk-video');
+        if (vid) vid.pause();
+    }
+
+    // Mute/unmute tap
+    slides.forEach(slide => {
+        const vid     = slide.querySelector('.tk-video');
+        const muteBtn = slide.querySelector('.tk-mute-btn');
+        if (!vid || !muteBtn) return;
+        function updateMuteIcon() {
+            muteBtn.innerHTML = vid.muted
+                ? '<i class="bi bi-volume-mute-fill"></i>'
+                : '<i class="bi bi-volume-up-fill"></i>';
+        }
+        vid.addEventListener('click', () => {
+            muted = !muted;
+            slides.forEach(s => { const v = s.querySelector('.tk-video'); if(v) v.muted = muted; });
+            updateMuteIcon();
+        });
+        muteBtn.addEventListener('click', () => {
+            muted = !muted;
+            slides.forEach(s => { const v = s.querySelector('.tk-video'); if(v) v.muted = muted; });
+            updateMuteIcon();
+        });
+    });
+
+    // Progress bar
+    function updateProgress(slide, vid) {
+        const wrap = slide.querySelector('.tk-progress-wrap');
+        const bar  = slide.querySelector('.tk-progress-bar');
+        if (!wrap || !bar || !vid.duration) return;
+        wrap.style.display = 'block';
+        function tick() {
+            if (vid.paused) return;
+            bar.style.width = (vid.currentTime / vid.duration * 100) + '%';
+            requestAnimationFrame(tick);
+        }
+        vid.addEventListener('play', tick, { once: false });
+    }
+
+    // Like button
+    slides.forEach(slide => {
+        const likeBtn   = slide.querySelector('.tk-like-btn');
+        const likeCount = slide.querySelector('.tk-like-count');
+        if (!likeBtn) return;
+        const videoId   = slide.dataset.videoId;
+
+        likeBtn.addEventListener('click', async () => {
+            // Optimistic UI
+            const wasLiked = likeBtn.classList.contains('liked');
+            likeBtn.classList.toggle('liked');
+            likeBtn.querySelector('i').className = wasLiked ? 'bi bi-heart' : 'bi bi-heart-fill';
+            if (likeCount) {
+                const n = parseInt(likeCount.textContent) || 0;
+                likeCount.textContent = wasLiked ? Math.max(0, n - 1) : n + 1;
+            }
+            likeBtn.classList.add('tk-like-pop');
+            setTimeout(() => likeBtn.classList.remove('tk-like-pop'), 400);
+
+            try {
+                await fetch(`/api/video/${videoId}/like`, { method: 'POST' });
+            } catch(e) {}
+        });
+    });
+
+    // Share event page
+    window.tkShare = function() {
+        const url = window.location.href;
+        if (navigator.share) {
+            navigator.share({ title: {{ event.title|tojson }}, url });
+        } else {
+            navigator.clipboard.writeText(url).then(() => alert('Link copied!'));
+        }
+    };
+
+    // Keyboard nav
+    document.addEventListener('keydown', e => {
+        if (overlay.style.display === 'none') return;
+        if (e.key === 'Escape') closeReel();
+        if (e.key === 'ArrowDown' && current < slides.length - 1) { pauseSlide(current); current++; scrollToSlide(current); playSlide(current); }
+        if (e.key === 'ArrowUp'   && current > 0)                  { pauseSlide(current); current--; scrollToSlide(current); playSlide(current); }
+    });
+
+    // Touch swipe
+    let touchY = null;
+    feed.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; }, { passive: true });
+    feed.addEventListener('touchend', e => {
+        if (touchY === null) return;
+        const dy = e.changedTouches[0].clientY - touchY;
+        touchY = null;
+        if (Math.abs(dy) < 40) return;
+        if (dy < 0 && current < slides.length - 1) { pauseSlide(current); current++; scrollToSlide(current); playSlide(current); }
+        if (dy > 0 && current > 0)                  { pauseSlide(current); current--; scrollToSlide(current); playSlide(current); }
+    }, { passive: true });
+})();
 </script>
 {% endblock %}
