@@ -456,8 +456,136 @@ a { color: inherit; text-decoration: none; }
 
 
 /* ══════════════════════════════════════════════
-   EVENT CARDS (public + organizer)
+   EVENT LISTING CARDS  (book.html)
 ══════════════════════════════════════════════ */
+.ev-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ev-card {
+    display: block;
+    text-decoration: none;
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+    position: relative;
+}
+.ev-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--brand, var(--accent-gold));
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px var(--brand, var(--accent-gold));
+}
+
+/* Cover photo area */
+.ev-card-cover {
+    position: relative;
+    height: 180px;
+    background-size: cover;
+    background-position: center;
+}
+.ev-card-cover-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 40%, rgba(13,13,26,0.92) 100%);
+}
+.ev-card-badge {
+    position: absolute;
+    top: 12px; right: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.ev-badge-ok   { background: rgba(62,207,150,0.18); color: #3ecf96; border: 1px solid rgba(62,207,150,0.35); }
+.ev-badge-low  { background: rgba(245,200,66,0.18); color: var(--accent-gold); border: 1px solid rgba(245,200,66,0.35); }
+.ev-badge-sold { background: rgba(255,80,80,0.18);  color: #ff5050; border: 1px solid rgba(255,80,80,0.35); }
+
+/* Info body */
+.ev-card-body {
+    padding: 16px 20px 14px;
+}
+.ev-card-org {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+.ev-card-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    letter-spacing: 0.5px;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 8px;
+}
+.ev-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+.ev-card-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.ev-card-price {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex: 1;
+}
+.ev-card-from { font-size: 11px; color: var(--text-muted); }
+.ev-card-price-num {
+    font-family: var(--font-display);
+    font-size: 26px;
+    letter-spacing: 0.5px;
+    line-height: 1;
+}
+.ev-card-price-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.ev-card-seats {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-teal);
+    white-space: nowrap;
+}
+.ev-card-seats.ev-badge-low  { color: var(--accent-gold); }
+.ev-card-seats.ev-badge-sold { color: #ff5050; }
+.ev-card-arrow {
+    font-size: 20px;
+    flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.15s, transform 0.15s;
+}
+.ev-card:hover .ev-card-arrow { opacity: 1; transform: translateX(3px); }
+
+/* Progress bar — full width, thin */
+.ev-card-progress {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+.ev-card-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s;
+    min-width: 2px;
+}
+
+/* Legacy classes kept for organizer event list page */
 .event-card {
     display: flex;
     justify-content: space-between;
@@ -473,48 +601,18 @@ a { color: inherit; text-decoration: none; }
     margin-bottom: 4px;
     line-height: 1.1;
 }
-.event-meta {
-    font-size: 12px;
-    color: var(--text-secondary);
-}
-.event-venue {
-    font-size: 12px;
-    color: var(--accent-purple);
-    margin-top: 4px;
-}
-.event-price {
-    font-family: var(--font-display);
-    font-size: 24px;
-    color: var(--accent-gold);
-    letter-spacing: 0.5px;
-}
-.event-price-unit {
-    font-size: 11px;
-    color: var(--text-secondary);
-    font-family: var(--font-body);
-}
-.event-seats-info {
-    font-size: 11px;
-    color: var(--text-secondary);
-    margin-top: 4px;
-    text-align: right;
-}
+.event-meta  { font-size: 12px; color: var(--text-secondary); }
+.event-venue { font-size: 12px; color: var(--accent-purple); margin-top: 4px; }
+.event-price { font-family: var(--font-display); font-size: 24px; color: var(--accent-gold); letter-spacing: 0.5px; }
+.event-price-unit { font-size: 11px; color: var(--text-secondary); font-family: var(--font-body); }
+.progress-bar { width: 80px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px; margin-left: auto; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-teal), var(--accent-purple)); border-radius: 2px; transition: width 0.4s; }
 
-/* ── Progress Bar ── */
-.progress-bar {
-    width: 80px;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 6px;
-    margin-left: auto;
-    overflow: hidden;
-}
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-teal), var(--accent-purple));
-    border-radius: 2px;
-    transition: width 0.4s;
+@media (max-width: 600px) {
+    .ev-card-cover { height: 140px; }
+    .ev-card-title { font-size: 20px; }
+    .ev-card-price-num { font-size: 22px; }
+    .ev-card-body { padding: 12px 14px 10px; }
 }
 
 
@@ -1904,79 +2002,226 @@ a { color: inherit; text-decoration: none; }
 
 
 /* ══════════════════════════════════════════════
-   ORGANIZER BRANDING — event hero
+   EVENT POSTER HERO  (book_event.html)
 ══════════════════════════════════════════════ */
-.event-hero-card { position: relative; overflow: hidden; }
 
-.event-hero-cover {
+/* Full-bleed poster — sits outside normal card flow */
+.ev-poster {
+    position: relative;
+    width: calc(100% + 32px); /* bleed past pub-main padding */
+    margin-left: -16px;
+    margin-top: -24px;        /* bleed past top padding too */
+    margin-bottom: 28px;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+}
+
+/* Photo background layer */
+.ev-poster-bg {
     position: absolute;
     inset: 0;
     background-size: cover;
-    background-position: center;
-    opacity: 0.18;
-    filter: blur(2px);
-    z-index: 0;
+    background-position: center top;
+    transform: scale(1.04);  /* slight scale prevents edge gaps on filter */
 }
-.event-hero-cover-dim {
+
+/* Scrim — darkens the bg so text reads cleanly */
+.ev-poster-scrim {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom, rgba(13,13,26,0.3) 0%, rgba(13,13,26,0.85) 100%);
-    z-index: 0;
+}
+.ev-poster-scrim-photo {
+    background:
+        linear-gradient(to bottom,
+            rgba(10,10,22,0.25) 0%,
+            rgba(10,10,22,0.10) 30%,
+            rgba(10,10,22,0.65) 62%,
+            rgba(10,10,22,0.97) 100%);
+}
+.ev-poster-scrim-plain {
+    /* No photo: rich dark gradient that bleeds the brand color slightly at top */
+    background:
+        linear-gradient(160deg,
+            rgba(20,16,50,0.98) 0%,
+            rgba(13,13,26,0.98) 60%,
+            rgba(13,13,26,1)    100%);
 }
 
-.org-brand-badge {
+/* Back link — top-left corner, always readable */
+.ev-poster-back {
+    position: absolute;
+    top: 18px; left: 18px;
+    z-index: 10;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    text-decoration: none;
+    background: rgba(0,0,0,0.35);
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(6px);
+    transition: background 0.15s, color 0.15s;
+}
+.ev-poster-back:hover { background: rgba(0,0,0,0.6); color: #fff; }
+
+/* Content area at the bottom of the poster */
+.ev-poster-body {
+    position: relative;
+    z-index: 2;
+    padding: 0 20px 24px;
+}
+
+/* Organizer pill */
+.ev-org-pill {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 7px 14px 7px 10px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 5px 12px 5px 6px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
     border-radius: 30px;
+    backdrop-filter: blur(8px);
 }
-.org-brand-logo {
-    height: 28px;
-    width: 28px;
+.ev-org-logo {
+    width: 26px; height: 26px;
+    border-radius: 50%;
     object-fit: contain;
-    border-radius: 6px;
+    background: rgba(255,255,255,0.1);
 }
-.org-brand-name {
+.ev-org-name {
     font-family: var(--font-display);
-    font-size: 15px;
+    font-size: 13px;
     letter-spacing: 0.5px;
+    color: var(--brand, #f5c842);
 }
-.org-brand-tagline {
-    display: block;
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 1px;
+.ev-org-tagline {
+    font-size: 10px;
+    color: rgba(255,255,255,0.45);
+    margin-left: 2px;
 }
 
+/* Event title */
+.ev-title {
+    font-family: var(--font-display);
+    font-size: 46px;
+    letter-spacing: 1.5px;
+    color: #fff;
+    line-height: 1.05;
+    margin: 0 0 10px;
+    text-shadow: 0 2px 18px rgba(0,0,0,0.6);
+}
+
+/* Meta strip: date · time · venue */
+.ev-meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+.ev-meta-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+}
+.ev-meta-icon { font-size: 13px; }
+.ev-meta-dot {
+    color: rgba(255,255,255,0.25);
+    font-size: 12px;
+}
+
+/* Price + CTA row */
+.ev-price-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.ev-price-block {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex: 1;
+}
+.ev-price-from {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+}
+.ev-price-num {
+    font-family: var(--font-display);
+    font-size: 36px;
+    letter-spacing: 0.5px;
+    color: var(--brand, #f5c842);
+    line-height: 1;
+}
+.ev-price-unit {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+}
+.ev-cta-btn {
+    flex-shrink: 0;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-family: var(--font-display);
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    text-decoration: none;
+    text-align: center;
+    transition: opacity 0.15s, transform 0.12s;
+    white-space: nowrap;
+}
+.ev-cta-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.ev-cta-btn:active { transform: translateY(0); }
+
 /* Share row */
-.event-share-row {
+.ev-share-row {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-top: 18px;
 }
-.event-share-btn {
+.ev-share-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 14px;
+    padding: 6px 14px;
     border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.15);
-    background: rgba(255,255,255,0.07);
-    color: var(--text-secondary);
+    border: 1px solid rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.65);
     font-size: 12px;
     font-family: var(--font-body);
     cursor: pointer;
     text-decoration: none;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
     white-space: nowrap;
+    backdrop-filter: blur(4px);
 }
-.event-share-btn:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); }
-.event-share-wa { color: #25d366; border-color: rgba(37,211,102,0.3); }
-.event-share-wa:hover { background: rgba(37,211,102,0.1); border-color: #25d366; }
+.ev-share-btn:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.12); color: #fff; }
+.ev-share-wa { color: #25d366; border-color: rgba(37,211,102,0.3); }
+.ev-share-wa:hover { background: rgba(37,211,102,0.12); border-color: #25d366; }
+
+/* Responsive */
+@media (max-width: 600px) {
+    .ev-poster { width: calc(100% + 24px); margin-left: -12px; min-height: 360px; }
+    .ev-title  { font-size: 34px; }
+    .ev-price-num { font-size: 28px; }
+    .ev-cta-btn   { padding: 10px 16px; font-size: 16px; }
+    .ev-poster-body { padding: 0 14px 20px; }
+    .ev-meta-strip  { flex-direction: column; align-items: flex-start; gap: 3px; }
+    .ev-meta-dot    { display: none; }
+}
+@media (max-width: 380px) {
+    .ev-title  { font-size: 28px; }
+    .ev-price-num { font-size: 24px; }
+    .ev-price-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .ev-cta-btn   { width: 100%; justify-content: center; }
+}
 
 /* Payment info block */
 .payment-info-box {

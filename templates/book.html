@@ -3,51 +3,72 @@
 {% block content %}
 
 <div class="pub-hero animate-in">
-    <p class="pub-hero-title">What's On Tonight?</p>
+    <p class="pub-hero-title">What's On?</p>
     <p class="pub-hero-sub">Grab your seat before it's gone — comedy, music, live shows & more.</p>
 </div>
 
 {% if events %}
-<div>
+<div class="ev-list">
     {% for ev in events %}
-    <a href="{{ url_for('book_event', event_id=ev.id) }}" class="card card-clickable animate-in"
-       style="display:block;animation-delay:{{ loop.index0 * 0.06 }}s;{% if ev.cover %}padding:0;overflow:hidden{% endif %}">
+    <a href="{{ url_for('book_event', event_id=ev.id) }}" class="ev-card animate-in"
+       style="animation-delay:{{ loop.index0 * 0.05 }}s;--brand:{{ ev.org_brand_color or '#f5c842' }}">
 
+        <!-- Cover / poster top -->
         {% if ev.cover %}
-        <div class="event-cover" style="background-image:url('{{ url_for('static', filename=ev.cover) }}')">
-            <div class="event-cover-overlay">
-                <h3 class="event-title" style="font-size:26px">{{ ev.title }}</h3>
-                <p class="event-meta" style="color:rgba(255,255,255,0.7)">{{ ev.event_date|fmtdate }} · {{ ev.event_time|fmttime }}</p>
-            </div>
+        <div class="ev-card-cover" style="background-image:url('{{ url_for('static', filename=ev.cover) }}')">
+            <div class="ev-card-cover-scrim"></div>
+            {% set remaining = (ev.capacity or 0) - ev.booked %}
+            <span class="ev-card-badge {% if remaining <= 0 %}ev-badge-sold{% elif remaining <= 5 %}ev-badge-low{% else %}ev-badge-ok{% endif %}">
+                {% if remaining <= 0 %}Sold Out{% elif remaining <= 5 %}{{ remaining }} left!{% else %}{{ remaining }} seats{% endif %}
+            </span>
         </div>
-        <div style="padding:14px 20px 18px">
-        {% else %}
-        <div>
-            <h3 class="event-title">{{ ev.title }}</h3>
-            <p class="event-meta">{{ ev.event_date|fmtdate }} · {{ ev.event_time|fmttime }}</p>
         {% endif %}
 
-            <div class="event-card" style="margin-top:8px">
-                <div>
-                    <p class="event-venue">📍 {{ ev.venue_name or '—' }}</p>
-                    {% if ev.organizer_name %}
-                    <p style="font-size:11px;color:var(--text-muted);margin-top:3px">by {{ ev.organizer_name }}</p>
-                    {% endif %}
+        <!-- Info body -->
+        <div class="ev-card-body">
+            <!-- Org line -->
+            {% if ev.organizer_name %}
+            <p class="ev-card-org" style="color:{{ ev.org_brand_color or 'var(--text-muted)' }}">{{ ev.organizer_name }}</p>
+            {% endif %}
+
+            <h3 class="ev-card-title">{{ ev.title }}</h3>
+
+            <div class="ev-card-meta">
+                <span>📅 {{ ev.event_date|fmtdate }}</span>
+                <span>🕐 {{ ev.event_time|fmttime }}</span>
+                <span>📍 {{ ev.venue_name or '—' }}</span>
+            </div>
+
+            <div class="ev-card-footer">
+                <div class="ev-card-price">
+                    {% if ev.has_tiers %}<span class="ev-card-from">from</span>{% endif %}
+                    <span class="ev-card-price-num" style="color:{{ ev.org_brand_color or 'var(--accent-gold)' }}">
+                        {{ "{:,.0f}".format(ev.display_price) }}
+                    </span>
+                    <span class="ev-card-price-unit">TZS</span>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                    <p class="event-price">
-                        {% if ev.has_tiers %}from {% endif %}{{ "{:,.0f}".format(ev.display_price) }}
-                        <span class="event-price-unit">TZS</span>
-                    </p>
-                    {% set remaining = (ev.capacity or 0) - ev.booked %}
-                    <p style="font-size:12px;margin-top:4px;color:{% if remaining > 5 %}var(--accent-teal){% elif remaining > 0 %}var(--accent-gold){% else %}var(--accent-red){% endif %}">
-                        {% if remaining > 0 %}{{ remaining }} seats left{% else %}Sold out{% endif %}
-                    </p>
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width:{{ ((ev.booked / ev.capacity * 100) if ev.capacity else 0)|int }}%"></div>
-                    </div>
+
+                {% if not ev.cover %}
+                <!-- No cover: show seat bar inline -->
+                {% set remaining = (ev.capacity or 0) - ev.booked %}
+                <span class="ev-card-seats {% if remaining <= 0 %}ev-badge-sold{% elif remaining <= 5 %}ev-badge-low{% endif %}">
+                    {% if remaining <= 0 %}Sold Out
+                    {% elif remaining <= 5 %}{{ remaining }} left!
+                    {% else %}{{ remaining }} seats
+                    {% endif %}
+                </span>
+                {% endif %}
+
+                <span class="ev-card-arrow" style="color:{{ ev.org_brand_color or 'var(--accent-gold)' }}">→</span>
+            </div>
+
+            {% if ev.capacity %}
+            <div class="ev-card-progress">
+                <div class="ev-card-progress-fill"
+                     style="width:{{ ((ev.booked / ev.capacity * 100) if ev.capacity else 0)|int }}%;background:{{ ev.org_brand_color or 'var(--accent-gold)' }}">
                 </div>
             </div>
+            {% endif %}
         </div>
     </a>
     {% endfor %}
