@@ -29,7 +29,7 @@
 <!-- PWA Install Banner -->
 <div class="pwa-install-banner" id="pwa-install-banner" style="display:none">
     <div class="pwa-install-inner">
-        <span class="pwa-install-icon">🎤</span>
+        <span class="pwa-install-icon"><i class="bi bi-music-note-beamed"></i></span>
         <div class="pwa-install-text">
             <strong>Install ShowRunner</strong>
             <span>Get the app — fast, offline-ready</span>
@@ -57,7 +57,7 @@
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <a href="{{ url_for('org_dashboard') }}" class="sidebar-brand-row" style="text-decoration:none">
-                <div class="sidebar-icon">🎤</div>
+                <div class="sidebar-icon"><i class="bi bi-music-note-beamed"></i></div>
                 <span class="sidebar-title">ShowRunner</span>
             </a>
             <div style="margin-top:10px">
@@ -113,7 +113,7 @@
 
 <header class="pub-header">
     <a href="{{ url_for('book_list') }}" class="pub-brand">
-        <div class="pub-brand-icon">🎤</div>
+        <div class="pub-brand-icon"><i class="bi bi-music-note-beamed"></i></div>
         <div>
             <div class="pub-brand-title">ShowRunner</div>
             <div class="pub-brand-sub">Live Events &amp; Tickets</div>
@@ -127,7 +127,7 @@
         {% if current_user %}
             <a href="{{ url_for('my_tickets') }}"
                class="pub-nav-item {% if request.endpoint == 'my_tickets' %}active{% endif %}">
-                🎟 My Tickets
+                <i class="bi bi-ticket-perforated"></i> My Tickets
             </a>
             <span class="role-pill role-pill-user" style="margin-left:4px">{{ current_user.name }}</span>
             <a href="{{ url_for('user_logout') }}" class="pub-nav-item" style="color:var(--text-muted)">Logout</a>

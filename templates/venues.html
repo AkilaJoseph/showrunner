@@ -3,7 +3,9 @@
 {% block content %}
 <div class="page-header">
     <h2 class="page-title" style="margin-bottom:0">Venues</h2>
-    <a href="{{ url_for('org_create_venue') }}" class="btn btn-primary">+ Add Venue</a>
+    <a href="{{ url_for('org_create_venue') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg" style="margin-right:4px"></i>Add Venue
+    </a>
 </div>
 
 {% if venues %}
@@ -14,15 +16,21 @@
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
             <div>
                 <h3 style="font-family:var(--font-display);font-size:20px;color:#fff;letter-spacing:0.5px">{{ v.name }}</h3>
-                <p style="font-size:12px;color:var(--accent-purple);margin-top:3px">📍 {{ v.location }}</p>
+                <p style="font-size:12px;color:var(--accent-purple);margin-top:3px">
+                    <i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ v.location }}
+                </p>
             </div>
-            <span class="tag tag-gold" style="flex-shrink:0;margin-left:8px">{{ v.capacity }} seats</span>
+            <span class="tag tag-gold" style="flex-shrink:0;margin-left:8px">
+                <i class="bi bi-people-fill" style="margin-right:3px"></i>{{ v.capacity }}
+            </span>
         </div>
         <div class="tags" style="margin-top:10px">
-            <span class="tag">{{ v.rows }} rows</span>
+            <span class="tag"><i class="bi bi-grid" style="margin-right:3px"></i>{{ v.rows }} rows</span>
             <span class="tag">{{ v.seats_per_row }} / row</span>
         </div>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:12px">Click to manage photos & details →</p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:12px">
+            <i class="bi bi-arrow-right" style="margin-right:2px"></i>Click to manage photos &amp; details
+        </p>
     </a>
     {% endfor %}
 </div>

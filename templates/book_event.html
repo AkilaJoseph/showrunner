@@ -28,7 +28,9 @@
     {% endif %}
 
     <!-- Back link floated top-left over the poster -->
-    <a href="{{ url_for('book_list') }}" class="ev-poster-back">← Events</a>
+    <a href="{{ url_for('book_list') }}" class="ev-poster-back">
+        <i class="bi bi-arrow-left"></i> Events
+    </a>
 
     <!-- Content sits at the bottom of the poster -->
     <div class="ev-poster-body">
@@ -50,15 +52,15 @@
         <!-- Meta strip -->
         <div class="ev-meta-strip">
             <span class="ev-meta-item">
-                <span class="ev-meta-icon">📅</span>{{ event.event_date|fmtdate }}
+                <i class="bi bi-calendar3 ev-meta-icon"></i>{{ event.event_date|fmtdate }}
             </span>
             <span class="ev-meta-dot">·</span>
             <span class="ev-meta-item">
-                <span class="ev-meta-icon">🕐</span>{{ event.event_time|fmttime }}
+                <i class="bi bi-clock ev-meta-icon"></i>{{ event.event_time|fmttime }}
             </span>
             <span class="ev-meta-dot">·</span>
             <span class="ev-meta-item">
-                <span class="ev-meta-icon">📍</span>{{ event.venue_name }}
+                <i class="bi bi-geo-alt-fill ev-meta-icon"></i>{{ event.venue_name }}
             </span>
         </div>
 
@@ -74,20 +76,22 @@
                 <span class="ev-price-unit">TZS / seat</span>
             </div>
             <a class="ev-cta-btn" href="#booking-form" style="background:{{ brand }};color:#111120">
-                Get Tickets ↓
+                Get Tickets <i class="bi bi-arrow-down-circle-fill" style="font-size:14px"></i>
             </a>
         </div>
 
         <!-- Share row -->
         <div class="ev-share-row">
-            <button class="ev-share-btn" onclick="copyEventLink(this)">🔗 Copy Link</button>
+            <button class="ev-share-btn" onclick="copyEventLink(this)">
+                <i class="bi bi-link-45deg"></i> Copy Link
+            </button>
             <a class="ev-share-btn ev-share-wa" id="wa-share-btn" href="#" target="_blank" rel="noopener">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 WhatsApp
             </a>
             {% if event.org_phone %}
             <a class="ev-share-btn" href="https://wa.me/{{ event.org_phone|replace('+','') |replace(' ','') |replace('-','') }}" target="_blank" rel="noopener">
-                📞 Organizer
+                <i class="bi bi-telephone-fill"></i> Organizer
             </a>
             {% endif %}
         </div>
@@ -97,7 +101,7 @@
 <!-- ── Description ── -->
 {% if event.description %}
 <div class="card" style="margin-bottom:22px">
-    <p class="section-title">About This Show</p>
+    <p class="section-title"><i class="bi bi-info-circle-fill" style="color:var(--accent-teal);margin-right:6px"></i>About This Show</p>
     <p style="font-size:14px;color:var(--text-secondary);line-height:1.8">{{ event.description|nl2br }}</p>
 </div>
 {% endif %}
@@ -105,14 +109,16 @@
 <!-- ── Performers ── -->
 {% if performers %}
 <div class="card" style="margin-bottom:22px">
-    <p class="section-title">🎭 Tonight's Lineup</p>
+    <p class="section-title"><i class="bi bi-people-fill" style="color:var(--accent-purple);margin-right:6px"></i>Tonight's Lineup</p>
     <div class="performers-grid">
         {% for p in performers %}
         <div class="performer-card performer-card-public">
             {% if p.photo %}
             <img src="{{ url_for('static', filename=p.photo) }}" alt="{{ p.name }}" class="performer-photo">
             {% else %}
-            <div class="performer-photo performer-photo-placeholder">🎤</div>
+            <div class="performer-photo performer-photo-placeholder">
+                <i class="bi bi-mic-fill" style="font-size:28px;color:var(--accent-gold)"></i>
+            </div>
             {% endif %}
             <div class="performer-info">
                 <p class="performer-name">{{ p.name }}</p>
@@ -128,7 +134,7 @@
 <!-- ── Event Gallery ── -->
 {% if event_photos|length > 1 %}
 <div class="card" style="margin-bottom:22px">
-    <p class="section-title">📸 From Previous Shows</p>
+    <p class="section-title"><i class="bi bi-images" style="color:var(--accent-gold);margin-right:6px"></i>From Previous Shows</p>
     <div class="photo-grid photo-grid-public">
         {% for p in event_photos %}
         <div class="photo-item photo-item-public">
@@ -143,7 +149,7 @@
 <!-- ── Video Highlights ── -->
 {% if event_videos %}
 <div class="card" style="margin-bottom:22px;padding:20px 20px 16px">
-    <p class="section-title" style="margin-bottom:16px">🎬 Highlights</p>
+    <p class="section-title" style="margin-bottom:16px"><i class="bi bi-camera-video-fill" style="color:var(--accent-red);margin-right:6px"></i>Highlights</p>
     <div class="pub-video-reel" id="video-reel">
         {% for v in event_videos %}
         <div class="pub-video-item" data-src="{{ url_for('static', filename=v.filename) if v.filename else '' }}">
@@ -175,7 +181,7 @@
 
 <!-- ── Seat Map ── -->
 <div class="card" style="margin-bottom:22px">
-    <p class="section-title">🪑 Select Your Seats</p>
+    <p class="section-title"><i class="bi bi-grid-3x3-gap-fill" style="color:var(--accent-teal);margin-right:6px"></i>Select Your Seats</p>
     <div class="seat-map-container" id="seat-map"></div>
     <div id="selection-info" class="selection-info" style="display:none"></div>
 </div>
@@ -183,7 +189,7 @@
 <!-- ── Venue Photos ── -->
 {% if venue_photos %}
 <div class="card" style="margin-bottom:22px">
-    <p class="section-title">🏟️ The Venue — {{ event.venue_name }}</p>
+    <p class="section-title"><i class="bi bi-building-fill" style="color:var(--accent-purple);margin-right:6px"></i>The Venue — {{ event.venue_name }}</p>
     <div class="photo-grid photo-grid-public">
         {% for p in venue_photos %}
         <div class="photo-item photo-item-public">
@@ -198,7 +204,7 @@
 <!-- ── Payment Instructions ── -->
 {% if event.payment_info %}
 <div class="card" style="margin-bottom:22px;border-color:{{ brand }}44">
-    <p class="section-title">💳 How to Pay</p>
+    <p class="section-title"><i class="bi bi-credit-card-fill" style="color:{{ brand }};margin-right:6px"></i>How to Pay</p>
     <div class="payment-info-box" style="border-left-color:{{ brand }}">
         {{ event.payment_info|nl2br }}
     </div>
@@ -207,7 +213,7 @@
 
 <!-- ── Booking Form ── -->
 <form method="POST" class="form-card" id="booking-form">
-    <p class="section-title">Your Details</p>
+    <p class="section-title"><i class="bi bi-person-fill" style="margin-right:6px"></i>Your Details</p>
     <input type="hidden" name="selected_seats" id="selected_seats" value="">
     <div class="field">
         <label for="customer_name">Full Name *</label>
@@ -268,15 +274,12 @@ document.getElementById("booking-form").addEventListener("submit", function(e) {
         'https://wa.me/?text=' + encodeURIComponent(msg);
 })();
 
-// Video reel items open in lightbox (wired by LB in app.js)
-// Play buttons are cosmetic only — clicking opens fullscreen
-
 // Copy link
 function copyEventLink(btn) {
     navigator.clipboard.writeText(window.location.href).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = '✓ Copied!';
-        setTimeout(() => btn.textContent = orig, 2000);
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+        setTimeout(() => btn.innerHTML = orig, 2000);
     }).catch(() => {
         prompt('Copy this link:', window.location.href);
     });

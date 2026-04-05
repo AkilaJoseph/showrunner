@@ -34,9 +34,9 @@
             <h3 class="ev-card-title">{{ ev.title }}</h3>
 
             <div class="ev-card-meta">
-                <span>📅 {{ ev.event_date|fmtdate }}</span>
-                <span>🕐 {{ ev.event_time|fmttime }}</span>
-                <span>📍 {{ ev.venue_name or '—' }}</span>
+                <span><i class="bi bi-calendar3" style="margin-right:3px"></i>{{ ev.event_date|fmtdate }}</span>
+                <span><i class="bi bi-clock" style="margin-right:3px"></i>{{ ev.event_time|fmttime }}</span>
+                <span><i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ ev.venue_name or '—' }}</span>
             </div>
 
             <div class="ev-card-footer">

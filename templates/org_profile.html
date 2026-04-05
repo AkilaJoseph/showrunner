@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Brand Profile — ShowRunner{% endblock %}
 {% block content %}
-<h2 class="page-title">🎨 Brand Profile</h2>
+<h2 class="page-title"><i class="bi bi-palette-fill" style="color:var(--accent-gold);margin-right:8px"></i>Brand Profile</h2>
 <p style="color:var(--text-secondary);margin-bottom:24px;font-size:14px">
     Your brand is shown on every event page, ticket, and share card — make it shine.
 </p>
@@ -23,7 +23,7 @@
         {% endif %}
         <div class="upload-zone" id="logo-zone" style="max-width:400px">
             <div class="upload-zone-inner" onclick="document.getElementById('logo-input').click()">
-                <div class="upload-icon">🖼️</div>
+                <div class="upload-icon"><i class="bi bi-image" style="font-size:28px"></i></div>
                 <p class="upload-label">Click to upload logo</p>
                 <p class="upload-hint">PNG or WEBP with transparent background works best</p>
                 <input type="file" id="logo-input" name="logo" accept="image/*"
@@ -65,7 +65,7 @@
             Used as accent on your event pages and shared ticket cards.
         </p>
         <div class="color-picker-row" style="margin-bottom:14px">
-            {% set presets = [('#f5c842','Gold'),('#7c6fff','Purple'),('#3ecfc6','Teal'),('#ff6eb4','Pink'),('#ff9f43','Orange'),('#8fe0b8','Green')] %}
+            {% set presets = [('#f5c842','Gold'),('#7c6fff','Purple'),('#3ecfc6','Teal'),('#ff6eb4','Pink'),('#ff9f43','Orange'),('#8fe0b8','Green'),('#ffffff','White'),('#111111','Black')] %}
             {% for hex, label in presets %}
             <label class="color-preset-label" title="{{ label }}">
                 <input type="radio" name="brand_color_preset" value="{{ hex }}" style="display:none"

@@ -2,13 +2,15 @@
 {% block title %}My Tickets — ShowRunner{% endblock %}
 {% block content %}
 
-<h2 class="page-title">My Tickets</h2>
+<h2 class="page-title">
+    <i class="bi bi-ticket-perforated-fill" style="color:var(--accent-gold);margin-right:8px"></i>My Tickets
+</h2>
 <p class="page-subtitle">All your bookings in one place. Show the QR code at the entrance.</p>
 
 {% if not upcoming and not past %}
 <div class="empty-state">
     You haven't booked any tickets yet.<br>
-    <a href="{{ url_for('book_list') }}" style="color:var(--accent-gold)">Browse events →</a>
+    <a href="{{ url_for('book_list') }}" style="color:var(--accent-gold)">Browse events <i class="bi bi-arrow-right"></i></a>
 </div>
 {% endif %}
 
@@ -21,11 +23,17 @@
         <div class="my-ticket-header">
             <div>
                 <p class="my-ticket-event">{{ b.event_title }}</p>
-                <p class="my-ticket-meta">{{ b.event_date|fmtdate }} · {{ b.event_time|fmttime }}</p>
-                <p class="my-ticket-venue">📍 {{ b.venue_name or '—' }}</p>
+                <p class="my-ticket-meta">
+                    <i class="bi bi-calendar3" style="margin-right:3px"></i>{{ b.event_date|fmtdate }}
+                    &nbsp;·&nbsp;
+                    <i class="bi bi-clock" style="margin-right:3px"></i>{{ b.event_time|fmttime }}
+                </p>
+                <p class="my-ticket-venue">
+                    <i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ b.venue_name or '—' }}
+                </p>
             </div>
             <span class="badge {% if b.verified %}badge-verified{% else %}badge-pending{% endif %}" style="flex-shrink:0">
-                {% if b.verified %}✓ Used{% else %}Valid{% endif %}
+                {% if b.verified %}<i class="bi bi-patch-check-fill"></i> Used{% else %}Valid{% endif %}
             </span>
         </div>
         <div class="my-ticket-footer">
@@ -42,7 +50,9 @@
                 <p class="my-ticket-value" style="font-family:var(--font-code);color:var(--accent-purple)">{{ b.code }}</p>
             </div>
         </div>
-        <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:right">Tap to view ticket →</p>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:right">
+            Tap to view ticket <i class="bi bi-arrow-right"></i>
+        </p>
     </a>
     {% endfor %}
 </div>
@@ -57,8 +67,14 @@
         <div class="my-ticket-header">
             <div>
                 <p class="my-ticket-event">{{ b.event_title }}</p>
-                <p class="my-ticket-meta">{{ b.event_date|fmtdate }} · {{ b.event_time|fmttime }}</p>
-                <p class="my-ticket-venue">📍 {{ b.venue_name or '—' }}</p>
+                <p class="my-ticket-meta">
+                    <i class="bi bi-calendar3" style="margin-right:3px"></i>{{ b.event_date|fmtdate }}
+                    &nbsp;·&nbsp;
+                    <i class="bi bi-clock" style="margin-right:3px"></i>{{ b.event_time|fmttime }}
+                </p>
+                <p class="my-ticket-venue">
+                    <i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ b.venue_name or '—' }}
+                </p>
             </div>
             <span class="badge badge-verified" style="flex-shrink:0;opacity:0.6">Past</span>
         </div>

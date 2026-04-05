@@ -1442,12 +1442,4 @@ def api_event_tiers(event_id):
 
 # ─── Run ─────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # ssl_context='adhoc' enables HTTPS with a self-signed cert (requires pyOpenSSL).
-    # This is needed so getUserMedia (QR camera scanner) works on local network.
-    # Install: pip install pyopenssl
-    # Users will see a browser security warning — click "Advanced → Proceed" once.
-    try:
-        app.run(debug=True, host="0.0.0.0", port=5000, ssl_context="adhoc")
-    except Exception:
-        # Fall back to plain HTTP if pyOpenSSL is not installed
-        app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Create Event — ShowRunner{% endblock %}
 {% block content %}
-<a href="{{ url_for('org_events_list') }}" class="btn-back">← Back to Events</a>
+<a href="{{ url_for('org_events_list') }}" class="btn-back"><i class="bi bi-arrow-left" style="margin-right:4px"></i>Back to Events</a>
 <h2 class="page-title">Create Event</h2>
 
 {% if not venues %}
@@ -17,7 +17,7 @@
         <label>Cover Photo <span style="color:var(--text-muted);font-weight:400;font-size:11px">— shown on the events listing page</span></label>
         <div class="upload-zone" id="cover-zone">
             <div class="upload-zone-inner" onclick="document.getElementById('cover-input').click()">
-                <div class="upload-icon">🖼️</div>
+                <div class="upload-icon"><i class="bi bi-image" style="font-size:28px"></i></div>
                 <p class="upload-label">Click to choose a cover photo</p>
                 <p class="upload-hint">Wide (landscape) images work best — PNG, JPG, WEBP</p>
                 <input type="file" id="cover-input" name="cover_photo" accept="image/*"

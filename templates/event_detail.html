@@ -10,9 +10,9 @@
             <h2 style="font-family:var(--font-display);font-size:30px;letter-spacing:1px;color:#fff">{{ event.title }}</h2>
             <p style="color:var(--text-secondary);margin-top:4px">{{ event.description or 'No description' }}</p>
             <div class="tags" style="margin-top:12px">
-                <span class="tag">📅 {{ event.event_date|fmtdate }}</span>
-                <span class="tag">🕐 {{ event.event_time|fmttime }}</span>
-                <span class="tag">📍 {{ event.venue_name or '—' }}</span>
+                <span class="tag"><i class="bi bi-calendar3" style="margin-right:3px"></i>{{ event.event_date|fmtdate }}</span>
+                <span class="tag"><i class="bi bi-clock" style="margin-right:3px"></i>{{ event.event_time|fmttime }}</span>
+                <span class="tag"><i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ event.venue_name or '—' }}</span>
                 <span class="tag tag-gold">💰 {{ "{:,.0f}".format(event.price) }} TZS base</span>
             </div>
         </div>
@@ -25,7 +25,7 @@
 
 <!-- ── Seat Tiers ── -->
 <div class="card">
-    <p class="section-title">🎫 Ticket Tiers
+    <p class="section-title"><i class="bi bi-ticket-perforated-fill" style="color:var(--accent-gold);margin-right:6px"></i>Ticket Tiers
         <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">
             Assign row ranges different prices (VIP, VVIP, Regular…)
         </span>
@@ -118,7 +118,7 @@
 
 <!-- ── Performers ── -->
 <div class="card">
-    <p class="section-title">🎭 Lineup / Performers</p>
+    <p class="section-title"><i class="bi bi-people-fill" style="color:var(--accent-purple);margin-right:6px"></i>Lineup / Performers</p>
     {% if performers %}
     <div class="performers-grid">
         {% for p in performers %}
@@ -126,7 +126,9 @@
             {% if p.photo %}
             <img src="{{ url_for('static', filename=p.photo) }}" alt="{{ p.name }}" class="performer-photo">
             {% else %}
-            <div class="performer-photo performer-photo-placeholder">🎤</div>
+            <div class="performer-photo performer-photo-placeholder">
+                <i class="bi bi-mic-fill" style="font-size:28px;color:var(--accent-gold)"></i>
+            </div>
             {% endif %}
             <div class="performer-info">
                 <p class="performer-name">{{ p.name }}</p>
@@ -170,7 +172,7 @@
 
 <!-- ── Event Gallery ── -->
 <div class="card">
-    <p class="section-title">📸 Event Gallery
+    <p class="section-title"><i class="bi bi-images" style="color:var(--accent-teal);margin-right:6px"></i>Event Gallery
         <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">Moments from past shows</span>
     </p>
     {% if photos %}
@@ -208,7 +210,7 @@
 
 <!-- ── Video Clips ── -->
 <div class="card">
-    <p class="section-title">🎬 Video Clips
+    <p class="section-title"><i class="bi bi-camera-video-fill" style="color:var(--accent-red);margin-right:6px"></i>Video Clips
         <span style="color:var(--text-muted);font-weight:400;font-size:11px;margin-left:6px">Upload short clips or paste YouTube / TikTok / Instagram links</span>
     </p>
 

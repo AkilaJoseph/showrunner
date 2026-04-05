@@ -3,7 +3,9 @@
 {% block content %}
 <div class="page-header">
     <h2 class="page-title" style="margin-bottom:0">Events</h2>
-    <a href="{{ url_for('org_create_event') }}" class="btn btn-primary">+ New Event</a>
+    <a href="{{ url_for('org_create_event') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg" style="margin-right:4px"></i>New Event
+    </a>
 </div>
 
 {% if events %}
@@ -13,8 +15,14 @@
         <div class="event-card">
             <div>
                 <h3 class="event-title">{{ ev.title }}</h3>
-                <p class="event-meta">{{ ev.event_date|fmtdate }} · {{ ev.event_time|fmttime }}</p>
-                <p class="event-venue">📍 {{ ev.venue_name or '—' }}</p>
+                <p class="event-meta">
+                    <i class="bi bi-calendar3" style="margin-right:3px"></i>{{ ev.event_date|fmtdate }}
+                    &nbsp;·&nbsp;
+                    <i class="bi bi-clock" style="margin-right:3px"></i>{{ ev.event_time|fmttime }}
+                </p>
+                <p class="event-venue">
+                    <i class="bi bi-geo-alt-fill" style="margin-right:3px"></i>{{ ev.venue_name or '—' }}
+                </p>
             </div>
             <div style="text-align:right">
                 <p class="event-price">{{ "{:,.0f}".format(ev.price) }} <span class="event-price-unit">TZS</span></p>
