@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 import uuid
 import string
@@ -11,10 +12,21 @@ from functools import wraps
 import qrcode
 from flask import (
     Flask, render_template, request, redirect,
-    url_for, flash, jsonify, session
+    url_for, flash, jsonify, session, make_response, send_from_directory
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+
+try:
+    from pywebpush import webpush, WebPushException
+    from py_vapid import Vapid
+    PUSH_AVAILABLE = True
+except ImportError:
+    PUSH_AVAILABLE = False
+
+VAPID_PRIVATE_KEY = None
+VAPID_PUBLIC_KEY  = None
+VAPID_CLAIMS      = {"sub": "mailto:admin@showrunner.app"}
 
 # ─── App Setup ───────────────────────────────────────────────
 app = Flask(__name__)
@@ -139,6 +151,15 @@ def init_db():
             FOREIGN KEY (event_id) REFERENCES events(id),
             FOREIGN KEY (user_id) REFERENCES users(id)
         );
+
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
     """)
     conn.commit()
     conn.close()
@@ -148,6 +169,122 @@ init_db()
 
 for sub in ("venues", "events", "performers"):
     os.makedirs(os.path.join(UPLOAD_FOLDER, sub), exist_ok=True)
+
+
+# ─── PWA: Icons ──────────────────────────────────────────────
+def generate_pwa_icons():
+    """Generate minimal app icons on first run using Pillow."""
+    try:
+        from PIL import Image, ImageDraw
+        icon_dir = os.path.join(os.path.dirname(__file__), "static", "icons")
+        os.makedirs(icon_dir, exist_ok=True)
+
+        for size in [192, 512]:
+            path = os.path.join(icon_dir, f"icon-{size}.png")
+            if os.path.exists(path):
+                continue
+
+            img  = Image.new("RGBA", (size, size), (13, 13, 26, 255))
+            draw = ImageDraw.Draw(img)
+
+            # Gold outer circle
+            p = int(size * 0.08)
+            draw.ellipse([p, p, size - p, size - p], fill=(245, 200, 66, 255))
+
+            # Dark inner circle
+            p2 = int(size * 0.20)
+            draw.ellipse([p2, p2, size - p2, size - p2], fill=(13, 13, 26, 255))
+
+            # Microphone body (rounded rect approximated with ellipse + rect)
+            cx    = size // 2
+            mw    = int(size * 0.13)
+            mh    = int(size * 0.24)
+            mtop  = int(size * 0.28)
+            mbot  = mtop + mh
+            lw    = max(2, int(size * 0.025))
+
+            # Mic capsule: filled rounded shape
+            draw.rectangle([cx - mw, mtop + mw, cx + mw, mbot - mw], fill=(245, 200, 66, 255))
+            draw.ellipse([cx - mw, mtop, cx + mw, mtop + mw * 2], fill=(245, 200, 66, 255))
+            draw.ellipse([cx - mw, mbot - mw * 2, cx + mw, mbot], fill=(245, 200, 66, 255))
+
+            # Mic stand line
+            stand_top = mbot
+            stand_bot = mbot + int(size * 0.10)
+            draw.line([cx, stand_top, cx, stand_bot], fill=(245, 200, 66, 255), width=lw)
+
+            # Base bar
+            bw = int(size * 0.15)
+            draw.line([cx - bw, stand_bot, cx + bw, stand_bot], fill=(245, 200, 66, 255), width=lw)
+
+            img.save(path, "PNG")
+
+        # Tiny badge icon (monochrome circle)
+        badge_path = os.path.join(icon_dir, "icon-badge.png")
+        if not os.path.exists(badge_path):
+            img  = Image.new("RGBA", (96, 96), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            draw.ellipse([4, 4, 92, 92], fill=(245, 200, 66, 255))
+            img.save(badge_path, "PNG")
+
+    except Exception:
+        pass  # Icons are optional; app works without them
+
+
+generate_pwa_icons()
+
+
+# ─── PWA: VAPID Keys ─────────────────────────────────────────
+def init_vapid():
+    global VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY
+    if not PUSH_AVAILABLE:
+        return
+    keys_file = os.path.join(os.path.dirname(__file__), "vapid_keys.json")
+    if os.path.exists(keys_file):
+        with open(keys_file) as f:
+            keys = json.load(f)
+        VAPID_PRIVATE_KEY = keys["private_key"]
+        VAPID_PUBLIC_KEY  = keys["public_key"]
+        return
+    try:
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+        v = Vapid()
+        v.generate_keys()
+        VAPID_PRIVATE_KEY = v.private_pem().decode("utf-8")
+        raw = v.public_key.public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+        VAPID_PUBLIC_KEY  = base64.urlsafe_b64encode(raw).decode("utf-8").rstrip("=")
+        with open(keys_file, "w") as f:
+            json.dump({"private_key": VAPID_PRIVATE_KEY, "public_key": VAPID_PUBLIC_KEY}, f)
+    except Exception:
+        pass
+
+
+init_vapid()
+
+
+# ─── PWA: Send Push Notification ────────────────────────────
+def send_push_to_user(user_id, title, body, url="/"):
+    if not PUSH_AVAILABLE or not VAPID_PRIVATE_KEY:
+        return
+    conn  = get_db()
+    subs  = conn.execute(
+        "SELECT * FROM push_subscriptions WHERE user_id=?", (user_id,)
+    ).fetchall()
+    conn.close()
+    payload = json.dumps({"title": title, "body": body, "url": url})
+    for sub in subs:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub["endpoint"],
+                    "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]},
+                },
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims=dict(VAPID_CLAIMS),
+            )
+        except Exception:
+            pass
 
 
 # ─── Auth Decorators ─────────────────────────────────────────
@@ -976,6 +1113,75 @@ def view_ticket(booking_id):
     conn.close()
     qr_b64 = generate_qr_base64(f"SHOWRUNNER|{booking['code']}|{booking['customer_name']}|{booking['seats']}")
     return render_template("ticket.html", booking=booking, event=event, qr_base64=qr_b64)
+
+
+# ─── PWA Routes ──────────────────────────────────────────────
+
+@app.route("/sw.js")
+def service_worker():
+    resp = make_response(send_from_directory("static", "sw.js"))
+    resp.headers["Content-Type"]          = "application/javascript; charset=utf-8"
+    resp.headers["Service-Worker-Allowed"] = "/"
+    resp.headers["Cache-Control"]          = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+@app.route("/manifest.json")
+def web_manifest():
+    resp = make_response(send_from_directory("static", "manifest.json"))
+    resp.headers["Content-Type"] = "application/manifest+json"
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/offline")
+def offline_page():
+    return render_template("offline.html")
+
+
+@app.route("/api/push/vapid-public-key")
+def push_vapid_key():
+    if not PUSH_AVAILABLE or not VAPID_PUBLIC_KEY:
+        return jsonify({"key": None})
+    return jsonify({"key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    if not PUSH_AVAILABLE:
+        return jsonify({"ok": False, "error": "Push not configured"}), 200
+    data     = request.get_json(force=True)
+    endpoint = data.get("endpoint")
+    p256dh   = data.get("keys", {}).get("p256dh")
+    auth     = data.get("keys", {}).get("auth")
+    if not endpoint or not p256dh or not auth:
+        return jsonify({"ok": False, "error": "Invalid subscription"}), 400
+    user_id = session.get("user_id")
+    conn    = get_db()
+    existing = conn.execute("SELECT id FROM push_subscriptions WHERE endpoint=?", (endpoint,)).fetchone()
+    if existing:
+        conn.execute(
+            "UPDATE push_subscriptions SET p256dh=?, auth=?, user_id=? WHERE endpoint=?",
+            (p256dh, auth, user_id, endpoint)
+        )
+    else:
+        conn.execute(
+            "INSERT INTO push_subscriptions (id,user_id,endpoint,p256dh,auth,created_at) VALUES(?,?,?,?,?,?)",
+            (new_id(), user_id, endpoint, p256dh, auth, datetime.now().isoformat())
+        )
+    conn.commit(); conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    data     = request.get_json(force=True)
+    endpoint = data.get("endpoint")
+    if endpoint:
+        conn = get_db()
+        conn.execute("DELETE FROM push_subscriptions WHERE endpoint=?", (endpoint,))
+        conn.commit(); conn.close()
+    return jsonify({"ok": True})
 
 
 # ─── API ─────────────────────────────────────────────────────

@@ -241,3 +241,26 @@ function formatVerifyInput(input) {
     }
     input.value = formatted;
 }
+
+
+// ── PWA: Push Notification Permission Button ──────────────────
+// Attach to any element with data-push-btn to trigger permission request
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("[data-push-btn]").forEach(btn => {
+        // Hide button if already subscribed or not supported
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+            btn.style.display = "none";
+            return;
+        }
+        if (Notification.permission === "granted") {
+            btn.textContent = "🔔 Notifications On";
+            btn.disabled = true;
+        }
+        btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            btn.textContent = "Enabling…";
+            const ok = await (window.SR && window.SR.requestPush ? window.SR.requestPush() : Promise.resolve(false));
+            btn.textContent = ok ? "🔔 Notifications On" : "Notifications unavailable";
+        });
+    });
+});

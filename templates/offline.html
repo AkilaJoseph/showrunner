@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline — ShowRunner</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .offline-wrap {
+            text-align: center;
+            padding: 40px 24px;
+            max-width: 360px;
+        }
+        .offline-icon {
+            font-size: 72px;
+            margin-bottom: 20px;
+            display: block;
+            filter: grayscale(0.3);
+        }
+        .offline-title {
+            font-family: 'Bangers', cursive;
+            font-size: 38px;
+            letter-spacing: 2px;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .offline-sub {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 28px;
+        }
+        .offline-retry {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 28px;
+            background: var(--accent-gold);
+            color: #111120;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Bangers', cursive;
+            font-size: 18px;
+            letter-spacing: 1px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .offline-retry:hover { opacity: 0.88; }
+    </style>
+</head>
+<body>
+    <div class="offline-wrap">
+        <span class="offline-icon">📡</span>
+        <div class="offline-title">You're Offline</div>
+        <p class="offline-sub">
+            ShowRunner needs a connection to load events and bookings.<br>
+            Check your Wi-Fi or mobile data, then try again.
+        </p>
+        <button class="offline-retry" onclick="window.location.reload()">
+            ↺ Retry
+        </button>
+    </div>
+</body>
+</html>

@@ -2,14 +2,40 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}ShowRunner{% endblock %}</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#f5c842">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ShowRunner">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+
+<!-- PWA Install Banner -->
+<div class="pwa-install-banner" id="pwa-install-banner" style="display:none">
+    <div class="pwa-install-inner">
+        <span class="pwa-install-icon">🎤</span>
+        <div class="pwa-install-text">
+            <strong>Install ShowRunner</strong>
+            <span>Get the app — fast, offline-ready</span>
+        </div>
+        <button class="pwa-install-btn" id="pwa-install-btn">Install</button>
+        <button class="pwa-install-dismiss" id="pwa-install-dismiss" title="Dismiss">✕</button>
+    </div>
+</div>
 
 <!-- Toast Messages -->
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -67,6 +93,7 @@
             </a>
         </div>
     </aside>
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <div class="org-body">
         <div class="org-topbar">
@@ -123,17 +150,92 @@
 
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
+// ── Sidebar ──────────────────────────────────────────────────
 function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('open');
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('visible');
 }
 document.addEventListener('click', function(e) {
     var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
     if (sidebar && sidebar.classList.contains('open')) {
         if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-toggle')) {
             sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('visible');
         }
     }
 });
+
+// ── PWA: Service Worker ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        .then(reg => {
+            // Check for SW updates every time the page loads
+            reg.update();
+        })
+        .catch(() => {});
+}
+
+// ── PWA: Install Banner ──────────────────────────────────────
+(function() {
+    var deferredPrompt = null;
+    var banner  = document.getElementById('pwa-install-banner');
+    var btn     = document.getElementById('pwa-install-btn');
+    var dismiss = document.getElementById('pwa-install-dismiss');
+
+    // Don't show if already dismissed or installed
+    if (localStorage.getItem('pwa-dismissed') || window.matchMedia('(display-mode: standalone)').matches) return;
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.style.display = 'block';
+    });
+
+    if (btn) btn.addEventListener('click', function() {
+        banner.style.display = 'none';
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function() { deferredPrompt = null; });
+        }
+    });
+
+    if (dismiss) dismiss.addEventListener('click', function() {
+        banner.style.display = 'none';
+        localStorage.setItem('pwa-dismissed', '1');
+    });
+})();
+
+// ── PWA: Push Notifications ──────────────────────────────────
+window.SR = window.SR || {};
+
+SR.requestPush = async function() {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) return false;
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return false;
+
+    try {
+        const keyResp = await fetch('/api/push/vapid-public-key');
+        const { key } = await keyResp.json();
+        if (!key) return false;
+
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: key,
+        });
+        await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub.toJSON()),
+        });
+        return true;
+    } catch(e) {
+        return false;
+    }
+};
 </script>
 {% block scripts %}{% endblock %}
 </body>
